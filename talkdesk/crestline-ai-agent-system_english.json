@@ -1,7 +1,7 @@
 {
   "account_id": "68668a003d12ae2f90ebbcb4",
   "agent_system_id": "ca6e8177-7d33-47bc-ae99-ee88fd982365",
-  "system_version": 16,
+  "system_version": 18,
   "status": "DRAFT",
   "agent_system_name": "Crestline_Insurance",
   "agent_system_description": "",
@@ -26,7 +26,7 @@
   "agents": [
     {
       "agent_id": "620c58ef-0e0c-44ee-bc08-84bcab00a29d",
-      "agent_version": 13,
+      "agent_version": 15,
       "role": "ACTION_AGENT",
       "agent_name": "Policy Agent",
       "goal": "Responsible for handling policy administration for Crestline Insurance for authenticated customers.",
@@ -56,7 +56,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 13,
+          "tool_version": 15,
           "tool_type": "MCP"
         },
         {
@@ -100,7 +100,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 3,
+          "tool_version": 5,
           "tool_type": "MCP"
         },
         {
@@ -236,14 +236,14 @@
               "value": null
             }
           },
-          "tool_version": 9,
+          "tool_version": 11,
           "tool_type": "WORKFLOW"
         }
       ]
     },
     {
       "agent_id": "6a5ce88a-a7a0-425a-8486-2fea660b182c",
-      "agent_version": 8,
+      "agent_version": 10,
       "role": "ACTION_AGENT",
       "agent_name": "Drivers Agent",
       "goal": "Responsible for handling driver administration for Crestline\nInsurance for authenticated customers.",
@@ -383,7 +383,7 @@
               "value": null
             }
           },
-          "tool_version": 8,
+          "tool_version": 10,
           "tool_type": "WORKFLOW"
         },
         {
@@ -427,7 +427,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 3,
+          "tool_version": 5,
           "tool_type": "MCP"
         },
         {
@@ -453,14 +453,14 @@
             }
           },
           "output_params": {},
-          "tool_version": 8,
+          "tool_version": 10,
           "tool_type": "MCP"
         }
       ]
     },
     {
       "agent_id": "7abd46f0-1788-48f1-988f-708600062582",
-      "agent_version": 5,
+      "agent_version": 7,
       "role": "ACTION_AGENT",
       "agent_name": "Claims Knowledge Agent",
       "goal": "Responsible for answering claim status inquiries, explaining\nclaim details, and answering general insurance knowledge\nquestions for Crestline Insurance authenticated customers.",
@@ -468,7 +468,7 @@
       "routing_condition": "",
       "tools": [
         {
-          "tool_id": "search_knowledge_internal_06dc8e02-cb5c-4145-a0b4-2a26851810a9",
+          "tool_id": "search_knowledge_internal_27785916-4a6a-466a-a373-6e212d021321",
           "tool_version": 1,
           "tool_type": "REST",
           "tool_name": "search_knowledge_internal",
@@ -525,7 +525,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 5,
+          "tool_version": 7,
           "tool_type": "MCP"
         },
         {
@@ -661,14 +661,14 @@
               "value": null
             }
           },
-          "tool_version": 5,
+          "tool_version": 7,
           "tool_type": "WORKFLOW"
         }
       ]
     },
     {
       "agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "agent_version": 16,
+      "agent_version": 18,
       "role": "SUPERVISING_AGENT",
       "agent_name": "Crestline Orchestrator",
       "goal": "You are the Crestline Insurance's  virtual assistant. You greet, route, and close. You contain ZERO business logic.",
@@ -678,7 +678,7 @@
     },
     {
       "agent_id": "dce3a76f-e37a-4f45-92ab-0b166223ab17",
-      "agent_version": 13,
+      "agent_version": 15,
       "role": "ACTION_AGENT",
       "agent_name": "Claims Agent",
       "goal": "Responsible for handling claim filing and claim status inquiries for Crestline Insurance for authenticated customers.",
@@ -818,7 +818,7 @@
               "value": null
             }
           },
-          "tool_version": 8,
+          "tool_version": 10,
           "tool_type": "WORKFLOW"
         },
         {
@@ -844,7 +844,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 8,
+          "tool_version": 10,
           "tool_type": "MCP"
         },
         {
@@ -888,14 +888,14 @@
             }
           },
           "output_params": {},
-          "tool_version": 3,
+          "tool_version": 5,
           "tool_type": "MCP"
         }
       ]
     },
     {
       "agent_id": "e0ca36ce-096e-4f4d-b190-3989054039fd",
-      "agent_version": 12,
+      "agent_version": 14,
       "role": "ACTION_AGENT",
       "agent_name": "Vehicle Agent",
       "goal": "Responsible for handling vehicle administration for Crestline\nInsurance for authenticated customers.",
@@ -1035,7 +1035,7 @@
               "value": null
             }
           },
-          "tool_version": 9,
+          "tool_version": 11,
           "tool_type": "WORKFLOW"
         },
         {
@@ -1079,7 +1079,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 3,
+          "tool_version": 5,
           "tool_type": "MCP"
         },
         {
@@ -1105,14 +1105,14 @@
             }
           },
           "output_params": {},
-          "tool_version": 10,
+          "tool_version": 12,
           "tool_type": "MCP"
         }
       ]
     },
     {
       "agent_id": "ec894951-396d-47ac-9f33-a61625a6fce4",
-      "agent_version": 13,
+      "agent_version": 15,
       "role": "ACTION_AGENT",
       "agent_name": "Escalation Agent",
       "goal": "Responsible for handling Crestline Insurance customer requests about billing and new business quotes by gracefully transferring the customer to the appropriate human team with context.",
@@ -1122,7 +1122,7 @@
     },
     {
       "agent_id": "f5044118-885f-4706-b017-197a5989f38c",
-      "agent_version": 16,
+      "agent_version": 18,
       "role": "ACTION_AGENT",
       "agent_name": "Auth Agent",
       "goal": "Responsible for authenticating customers for Crestline Insurance, verifying identity via 6-digit OTP sent to registered phone number, and setting \"authenticated\", \"customer_id\", \"customer_fname\", \"customer_lname\", and \"customer_email\" variables.",
@@ -1390,7 +1390,7 @@
               "value": null
             }
           },
-          "tool_version": 10,
+          "tool_version": 12,
           "tool_type": "WORKFLOW"
         },
         {
@@ -1445,7 +1445,7 @@
               {
                 "id": "4egifIygC3xkh1OZRr037",
                 "data": {
-                  "code": "// random number between 100000 and 999999 to avoid leading zeros\nlet oneTimePin = String(Math.floor(Math.random() * 900000) + 100000);\n\nContext.setVariable('One_Time_Pin', oneTimePin);\n\nContext.setVariable('SMS_Number', \n    Context.getVariable('phone_number').replace(/\\D/g, \"\"));\n\nContext.setVariable('SMS_Message',\n    'Your one-time authentication PIN is ' + oneTimePin);",
+                  "code": "// random number between 100000 and 999999 to avoid leading zeros\nlet oneTimePin = String(Math.floor(Math.random() * 900000) + 100000);\n\nContext.setVariable('One_Time_Pin', oneTimePin);\n\nContext.setVariable('SMS_Number', '+' + \n    Context.getVariable('phone_number').replace(/\\D/g, \"\"));\n\nContext.setVariable('SMS_Message',\n    'Your one-time authentication PIN is ' + oneTimePin);",
                   "name": "Generate OTP"
                 },
                 "type": "function",
@@ -1460,7 +1460,7 @@
                   "name": "Send SMS",
                   "inputs": [
                     {
-                      "id": "69cfe8ea55cf4cdfe9ea14e2-arC4yitWdMXqAkglT8WeA",
+                      "id": "69f21fa806f020244c94f103-N2pXV5s3Ks-7ltWguEWDn",
                       "name": "To",
                       "type": "string",
                       "title": "Receiver's phone number",
@@ -1469,7 +1469,7 @@
                       "input_type": "variable"
                     },
                     {
-                      "id": "69cfe8ea55cf4cdfe9ea14e2-VVGgtL1IUmlXSz-otPgKQ",
+                      "id": "69f21fa806f020244c94f103-j4lkNdf_yVJFS1iho_Hx_",
                       "name": "Body",
                       "type": "string",
                       "title": "Text of the SMS",
@@ -1478,7 +1478,7 @@
                       "input_type": "variable"
                     }
                   ],
-                  "action_id": "69cfe8ea55cf4cdfe9ea14e2",
+                  "action_id": "69f21fa806f020244c94f103",
                   "connection_id": "69cb4374f32c68cba11f11df"
                 },
                 "type": "execute-action",
@@ -1594,7 +1594,7 @@
               "value": null
             }
           },
-          "tool_version": 15,
+          "tool_version": 17,
           "tool_type": "WORKFLOW"
         },
         {
@@ -1620,7 +1620,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 14,
+          "tool_version": 16,
           "tool_type": "MCP"
         }
       ]
@@ -1629,45 +1629,45 @@
   "links": [
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 16,
+      "source_agent_version": 18,
       "target_agent_id": "620c58ef-0e0c-44ee-bc08-84bcab00a29d",
-      "target_agent_version": 13
+      "target_agent_version": 15
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 16,
+      "source_agent_version": 18,
       "target_agent_id": "6a5ce88a-a7a0-425a-8486-2fea660b182c",
-      "target_agent_version": 8
+      "target_agent_version": 10
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 16,
+      "source_agent_version": 18,
       "target_agent_id": "7abd46f0-1788-48f1-988f-708600062582",
-      "target_agent_version": 5
+      "target_agent_version": 7
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 16,
+      "source_agent_version": 18,
       "target_agent_id": "dce3a76f-e37a-4f45-92ab-0b166223ab17",
-      "target_agent_version": 13
+      "target_agent_version": 15
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 16,
+      "source_agent_version": 18,
       "target_agent_id": "e0ca36ce-096e-4f4d-b190-3989054039fd",
-      "target_agent_version": 12
+      "target_agent_version": 14
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 16,
+      "source_agent_version": 18,
       "target_agent_id": "ec894951-396d-47ac-9f33-a61625a6fce4",
-      "target_agent_version": 13
+      "target_agent_version": 15
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 16,
+      "source_agent_version": 18,
       "target_agent_id": "f5044118-885f-4706-b017-197a5989f38c",
-      "target_agent_version": 16
+      "target_agent_version": 18
     }
   ],
   "markers": [],
