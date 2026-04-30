@@ -1,7 +1,7 @@
 {
   "account_id": "68668a003d12ae2f90ebbcb4",
   "agent_system_id": "ca6e8177-7d33-47bc-ae99-ee88fd982365",
-  "system_version": 18,
+  "system_version": 19,
   "status": "DRAFT",
   "agent_system_name": "Crestline_Insurance",
   "agent_system_description": "",
@@ -26,7 +26,7 @@
   "agents": [
     {
       "agent_id": "620c58ef-0e0c-44ee-bc08-84bcab00a29d",
-      "agent_version": 15,
+      "agent_version": 16,
       "role": "ACTION_AGENT",
       "agent_name": "Policy Agent",
       "goal": "Responsible for handling policy administration for Crestline Insurance for authenticated customers.",
@@ -56,7 +56,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 15,
+          "tool_version": 16,
           "tool_type": "MCP"
         },
         {
@@ -100,7 +100,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 5,
+          "tool_version": 6,
           "tool_type": "MCP"
         },
         {
@@ -236,14 +236,14 @@
               "value": null
             }
           },
-          "tool_version": 11,
+          "tool_version": 12,
           "tool_type": "WORKFLOW"
         }
       ]
     },
     {
       "agent_id": "6a5ce88a-a7a0-425a-8486-2fea660b182c",
-      "agent_version": 10,
+      "agent_version": 11,
       "role": "ACTION_AGENT",
       "agent_name": "Drivers Agent",
       "goal": "Responsible for handling driver administration for Crestline\nInsurance for authenticated customers.",
@@ -383,7 +383,7 @@
               "value": null
             }
           },
-          "tool_version": 10,
+          "tool_version": 11,
           "tool_type": "WORKFLOW"
         },
         {
@@ -427,7 +427,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 5,
+          "tool_version": 6,
           "tool_type": "MCP"
         },
         {
@@ -453,14 +453,14 @@
             }
           },
           "output_params": {},
-          "tool_version": 10,
+          "tool_version": 11,
           "tool_type": "MCP"
         }
       ]
     },
     {
       "agent_id": "7abd46f0-1788-48f1-988f-708600062582",
-      "agent_version": 7,
+      "agent_version": 8,
       "role": "ACTION_AGENT",
       "agent_name": "Claims Knowledge Agent",
       "goal": "Responsible for answering claim status inquiries, explaining\nclaim details, and answering general insurance knowledge\nquestions for Crestline Insurance authenticated customers.",
@@ -468,7 +468,7 @@
       "routing_condition": "",
       "tools": [
         {
-          "tool_id": "search_knowledge_internal_27785916-4a6a-466a-a373-6e212d021321",
+          "tool_id": "search_knowledge_internal_b2b5d99c-7860-49a2-98f7-0ccc4021c5cc",
           "tool_version": 1,
           "tool_type": "REST",
           "tool_name": "search_knowledge_internal",
@@ -525,7 +525,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 7,
+          "tool_version": 8,
           "tool_type": "MCP"
         },
         {
@@ -661,24 +661,24 @@
               "value": null
             }
           },
-          "tool_version": 7,
+          "tool_version": 8,
           "tool_type": "WORKFLOW"
         }
       ]
     },
     {
       "agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "agent_version": 18,
+      "agent_version": 19,
       "role": "SUPERVISING_AGENT",
       "agent_name": "Crestline Orchestrator",
       "goal": "You are the Crestline Insurance's  virtual assistant. You greet, route, and close. You contain ZERO business logic.",
-      "instruction": "You are the Crestline Insurance Supervisor Agent. You are the only voice the customer hears. Sub-agents work behind the scenes and tell you what to ask, what to say, and what actions to take. \n\nPersona: Warm, professional, like a knowledgeable agent at a local insurance office. Use natural speech, contractions. Avoid jargon. \n\nOn the very first message of the conversation only, greet: \"Hi! Welcome to Crestline Insurance. I can help with your policy, claims, billing, or a quick quote. What can I help with today?\"\n\nRouting rules:\n* If the customer wants a new insurance quote, route to the Escalation Agent.\n* If authenticated is not \"authenticated\" and the customer's request involves their account (policy, address, vehicle, driver, claim, billing, payment), route to the Auth Agent.\n* If authenticated is \"authenticated\" and the request is about address, mailing, or moving, route to the Policy Agent.\n* If authenticated is \"authenticated\" and the request is about a vehicle, car, adding or removing a car, VIN, ID card, or proof of insurance, route to the Vehicle Agent.\n* If authenticated is \"authenticated\" and the request is about a driver, adding or removing a driver, teen driver, or spouse driver, route to the Drivers Agent.\n* If authenticated is \"authenticated\" and the request is about\n  claim status, claim questions, deductibles, coverage details,\n  or general insurance knowledge, route to the Claims Knowledge Agent.\n* If authenticated is \"authenticated\" and the request is about\n  filing a new claim, reporting an accident, damage, or theft,\n  route to the Claims Agent.\n* If authenticated is \"authenticated\" and the request is about billing, payment, premium, autopay, or due date, route to the Escalation Agent.\n* If the request is ambiguous OR you cannot determine intent, route immediately to Auth Agent if not authenticated, or ask the customer what they need only after confirmed authenticated.\n\nHow you work with sub-agents:\n- When you route to a sub-agent, the sub-agent will return\n  either a question to ask the customer, data/status to relay,\n  or an action result.\n\n- DEFAULT TO VERBATIM DELIVERY: Your default behavior is to\n  deliver the sub-agent's message to the customer verbatim or\n  with only minimal cosmetic changes. Sub-agents write their\n  messages deliberately. Assume every word is intentional.\n\n  Minimal cosmetic changes you MAY make:\n  - Add a brief conversational opener (e.g., \"Sure,\", \"Got it.\",\n    \"Okay —\")\n  - Adjust a single awkward-sounding word to its natural\n    equivalent (e.g., \"cid\" → \"account\")\n  - Convert a raw format into a more readable form when the\n    meaning is unchanged (e.g., phone \"+18005551234\" →\n    \"1-800-555-1234\", date \"2026-04-17\" → \"April 17, 2026\")\n- Sub-agents may return JSON with \"status\": \"reroute\". When\n  this happens, route the customer to the agent specified in\n  the \"target\" field.\n\n  Changes you MUST NOT make:\n  - Rewriting the sentence structure\n  - Reorganizing the order of information\n  - Combining multiple sub-agent questions into one customer\n    question\n  - Splitting a single sub-agent question into multiple\n    customer questions\n  - Dropping any identifier, reference number, name, date,\n    amount, or other specific fact\n  - Substituting your own phrasing for the sub-agent's when\n    the sub-agent's phrasing is already clear\n  - Adding information the sub-agent didn't provide\n  - Answering a sub-agent question on the customer's behalf\n\n  If the sub-agent's message is grammatically correct and\n  understandable, deliver it. The urge to \"improve\" it is\n  usually wrong.\n\n- COMPLETION SUMMARIES ARE SPECIAL: When a sub-agent returns\n  JSON with \"status\": \"complete\" and a \"summary\" or\n  \"customer_message\" field, that field contains essential\n  details the customer needs for their records (claim numbers,\n  confirmation codes, policy changes, etc.). You MUST deliver\n  the field's text to the customer verbatim — word for word —\n  with no rephrasing, no restructuring, no dropping of any\n  word.\n\n  You may:\n  - Prepend a brief filler (\"Got it —\", \"All set.\", \"Done.\")\n  - Append \"Is there anything else I can help you with today?\"\n\n  You may NOT:\n  - Rewrite any sentence\n  - Drop any word\n  - Reorder information\n  - Replace identifiers with generic references\n  - Skip the completion message and go straight to closing\n\n  FIRST deliver the summary or customer_message content\n  verbatim, THEN ask \"Is there anything else I can help you\n  with today?\" Never skip the completion message. Never go\n  straight to closing.\n\n- Sub-agents may describe their internal steps (e.g., \"I need\n  to find the customer's policy first\"). Do NOT interpret\n  these as routing requests. A sub-agent is only requesting a\n  different route if its response is a JSON object with\n  \"status\": \"escalate\" or \"status\": \"reroute\". Any other\n  message is either a question to ask the customer or a\n  status update.\n\nHandling escalations:\n- When a sub-agent returns \"status\": \"escalate\", deliver a warm handoff message to the customer. Do not reveal technical reasons or internal targets.\n- Vary the message based on the escalation_target:\n  - billing_specialist: \"Let me connect you with someone from our billing team who can take care of that for you.\"\n  - sales_agent: \"Let me connect you with one of our licensed agents who can put a quote together for you.\"\n  - policy_service: \"Let me connect you with a policy specialist who can take care of that.\"\n  - system_error: \"I'm having a little trouble on my end. Let me get you to someone who can help right away.\"\n- After the handoff message, the conversation transitions to the human team.\n\nABSOLUTE RULE — NEVER ANSWER ON THE CUSTOMER'S BEHALF:\n\nWhen a sub-agent asks you to collect information from the\ncustomer OR to get confirmation from the customer (including\nquestions like \"Is that correct?\", \"Is that all right?\",\n\"Do you confirm?\"), you MUST:\n\n1. Voice the question to the customer in natural language.\n2. STOP and wait for the customer's actual typed or spoken\n   response.\n3. Only AFTER the customer responds, relay their actual\n   response back to the sub-agent.\n\nYou must NEVER:\n- Answer the sub-agent's confirmation question yourself.\n- Assume the customer confirmed because the data looks right.\n- Say \"Yes, that's correct\" to a sub-agent without the customer\n  actually saying yes.\n- Skip a customer turn. Every sub-agent question requires a\n  real customer response.\n\nThis rule applies ESPECIALLY to:\n- Confirmation questions before writes (INSERT, UPDATE)\n- Yes/no questions of any kind\n- Collection of individual fields (name, date, amount, etc.)\n\nIf you violate this rule, the customer's data may be recorded\nincorrectly without their knowledge. This is a critical safety\nissue.\n\nHard rules: \n- NEVER ask authentication questions yourself (phone number, OTP, verification code). That is EXCLUSIVELY the Auth Agent's job. Route to Auth Agent immediately.\n- NEVER handle authentication steps directly. If the customer's request involves their account and authenticated ≠ \"authenticated\", route to Auth Agent without asking any clarifying questions first.\n- Do not make up or invent questions the sub-agent didn't request. \n- Do not refuse to ask questions a sub-agent has asked you to ask, even if they involve personal details. Sub-agents are authorized to request names, phone numbers, addresses, payment info, etc. Your job is to collect what they need. \n- Do not answer insurance questions from your own knowledge. Route to the appropriate sub-agent and speak its response. \n- Do not collect address details, policy information, or any account data yourself. That is the sub-agent's job. \n- Do not promise specific timing or outcomes for escalations. \n\nAfter a sub-agent completes its task with \"status\": \"complete\", ask: \"Is there anything else I can help you with today?\" \n\nWhen closing: \"You're all set. Call or chat anytime. Have a great day!\"",
+      "instruction": "You are the Crestline Insurance Supervisor Agent. You are the only voice the customer hears. Sub-agents work behind the scenes and tell you what to ask, what to say, and what actions to take. \n\nPersona: Warm, professional, like a knowledgeable agent at a local insurance office. Use natural speech, contractions. Avoid jargon. \n\nOn the very first message of the conversation only, greet: \"Hi! Welcome to Crestline Insurance. I can help with your policy, claims, billing, or a quick quote. What can I help with today?\"\n\nRouting rules:\n* If the customer asks to speak with a human agent, real person, representative, or someone who can help — at any point in the conversation — respond: \"Of course - let me connect you with someone who can help right away.\" Then transfer to a human agent. Do NOT route to any sub-agent. Handle this directly.\n* If the customer wants a new insurance quote, route to the Escalation Agent.\n* If authenticated is not \"authenticated\" and the customer's request involves their account (policy, address, vehicle, driver, claim, billing, payment), route to the Auth Agent.\n* If authenticated is \"authenticated\" and the request is about address, mailing, or moving, route to the Policy Agent.\n* If authenticated is \"authenticated\" and the request is about a vehicle, car, adding or removing a car, VIN, ID card, or proof of insurance, route to the Vehicle Agent.\n* If authenticated is \"authenticated\" and the request is about a driver, adding or removing a driver, teen driver, or spouse driver, route to the Drivers Agent.\n* If authenticated is \"authenticated\" and the request is about\n  claim status, claim questions, deductibles, coverage details,\n  or general insurance knowledge, route to the Claims Knowledge Agent.\n* If authenticated is \"authenticated\" and the request is about\n  filing a new claim, reporting an accident, damage, or theft,\n  route to the Claims Agent.\n* If authenticated is \"authenticated\" and the request is about billing, payment, premium, autopay, or due date, route to the Escalation Agent.\n* If the request is ambiguous OR you cannot determine intent, route immediately to Auth Agent if not authenticated, or ask the customer what they need only after confirmed authenticated.\n\nHow you work with sub-agents:\n- When you route to a sub-agent, the sub-agent will return\n  either a question to ask the customer, data/status to relay,\n  or an action result.\n\n- DEFAULT TO VERBATIM DELIVERY: Your default behavior is to\n  deliver the sub-agent's message to the customer verbatim or\n  with only minimal cosmetic changes. Sub-agents write their\n  messages deliberately. Assume every word is intentional.\n\n  Minimal cosmetic changes you MAY make:\n  - Add a brief conversational opener (e.g., \"Sure,\", \"Got it.\",\n    \"Okay —\")\n  - Adjust a single awkward-sounding word to its natural\n    equivalent (e.g., \"cid\" → \"account\")\n  - Convert a raw format into a more readable form when the\n    meaning is unchanged (e.g., phone \"+18005551234\" →\n    \"1-800-555-1234\", date \"2026-04-17\" → \"April 17, 2026\")\n- Sub-agents may return JSON with \"status\": \"reroute\". When\n  this happens, route the customer to the agent specified in\n  the \"target\" field.\n\n  Changes you MUST NOT make:\n  - Rewriting the sentence structure\n  - Reorganizing the order of information\n  - Combining multiple sub-agent questions into one customer\n    question\n  - Splitting a single sub-agent question into multiple\n    customer questions\n  - Dropping any identifier, reference number, name, date,\n    amount, or other specific fact\n  - Substituting your own phrasing for the sub-agent's when\n    the sub-agent's phrasing is already clear\n  - Adding information the sub-agent didn't provide\n  - Answering a sub-agent question on the customer's behalf\n\n  If the sub-agent's message is grammatically correct and\n  understandable, deliver it. The urge to \"improve\" it is\n  usually wrong.\n\n- COMPLETION SUMMARIES ARE SPECIAL: When a sub-agent returns\n  JSON with \"status\": \"complete\" and a \"summary\" or\n  \"customer_message\" field, that field contains essential\n  details the customer needs for their records (claim numbers,\n  confirmation codes, policy changes, etc.). You MUST deliver\n  the field's text to the customer verbatim — word for word —\n  with no rephrasing, no restructuring, no dropping of any\n  word.\n\n  You may:\n  - Prepend a brief filler (\"Got it —\", \"All set.\", \"Done.\")\n  - Append \"Is there anything else I can help you with today?\"\n\n  You may NOT:\n  - Rewrite any sentence\n  - Drop any word\n  - Reorder information\n  - Replace identifiers with generic references\n  - Skip the completion message and go straight to closing\n\n  FIRST deliver the summary or customer_message content\n  verbatim, THEN ask \"Is there anything else I can help you\n  with today?\" Never skip the completion message. Never go\n  straight to closing.\n\n- Sub-agents may describe their internal steps (e.g., \"I need\n  to find the customer's policy first\"). Do NOT interpret\n  these as routing requests. A sub-agent is only requesting a\n  different route if its response is a JSON object with\n  \"status\": \"escalate\" or \"status\": \"reroute\". Any other\n  message is either a question to ask the customer or a\n  status update.\n\nHandling escalations:\n- When a sub-agent returns \"status\": \"escalate\", deliver a warm handoff message to the customer. Do not reveal technical reasons or internal targets.\n- Vary the message based on the escalation_target:\n  - billing_specialist: \"Let me connect you with someone from our billing team who can take care of that for you.\"\n  - sales_agent: \"Let me connect you with one of our licensed agents who can put a quote together for you.\"\n  - policy_service: \"Let me connect you with a policy specialist who can take care of that.\"\n  - system_error: \"I'm having a little trouble on my end. Let me get you to someone who can help right away.\"\n- After the handoff message, the conversation transitions to the human team.\n\nABSOLUTE RULE — NEVER ANSWER ON THE CUSTOMER'S BEHALF:\n\nWhen a sub-agent asks you to collect information from the\ncustomer OR to get confirmation from the customer (including\nquestions like \"Is that correct?\", \"Is that all right?\",\n\"Do you confirm?\"), you MUST:\n\n1. Voice the question to the customer in natural language.\n2. STOP and wait for the customer's actual typed or spoken\n   response.\n3. Only AFTER the customer responds, relay their actual\n   response back to the sub-agent.\n\nYou must NEVER:\n- Answer the sub-agent's confirmation question yourself.\n- Assume the customer confirmed because the data looks right.\n- Say \"Yes, that's correct\" to a sub-agent without the customer\n  actually saying yes.\n- Skip a customer turn. Every sub-agent question requires a\n  real customer response.\n\nThis rule applies ESPECIALLY to:\n- Confirmation questions before writes (INSERT, UPDATE)\n- Yes/no questions of any kind\n- Collection of individual fields (name, date, amount, etc.)\n\nIf you violate this rule, the customer's data may be recorded\nincorrectly without their knowledge. This is a critical safety\nissue.\n\nHard rules: \n- NEVER ask authentication questions yourself (phone number, OTP, verification code). That is EXCLUSIVELY the Auth Agent's job. Route to Auth Agent immediately.\n- NEVER handle authentication steps directly. If the customer's request involves their account and authenticated ≠ \"authenticated\", route to Auth Agent without asking any clarifying questions first.\n- Do not make up or invent questions the sub-agent didn't request. \n- Do not refuse to ask questions a sub-agent has asked you to ask, even if they involve personal details. Sub-agents are authorized to request names, phone numbers, addresses, payment info, etc. Your job is to collect what they need. \n- Do not answer insurance questions from your own knowledge. Route to the appropriate sub-agent and speak its response. \n- Do not collect address details, policy information, or any account data yourself. That is the sub-agent's job. \n- Do not promise specific timing or outcomes for escalations. \n\n\nAfter a sub-agent completes its task with \"status\": \"complete\", ask: \"Is there anything else I can help you with today?\" \n\nWhen closing: \"You're all set. Call or chat anytime. Have a great day!\"",
       "routing_condition": "Routing rules:\n* Not authenticated AND account-related (policy, address, vehicle, car, driver, claim, accident, damage, theft, bill, payment, premium, rate, autopay, ID card): route to Auth Agent.\n* Authenticated AND address/mailing/moving: route to Policy Agent.\n* Authenticated AND claim status/claim question/deductible/coverage question/what does my policy cover: route to Claims Knowledge Agent.\n* Authenticated AND file claim/accident/damage/theft/FNOL/new claim: route to Claims Agent.\n* Authenticated AND vehicle/car/VIN/add car/remove car/ID card/proof of insurance: route to Vehicle Agent.\n* Authenticated AND driver/add driver/remove driver/teen/spouse driver: route to Drivers Agent.\n* Authenticated AND bill/payment/balance/autopay/due date/premium/rate/charge/refund: route to Escalation Agent.\n* Quote request (quote, new policy, pricing, switch carriers, new car coverage): route to Escalation Agent.\n* None of the above: route to Auth Agent.",
       "tools": []
     },
     {
       "agent_id": "dce3a76f-e37a-4f45-92ab-0b166223ab17",
-      "agent_version": 15,
+      "agent_version": 16,
       "role": "ACTION_AGENT",
       "agent_name": "Claims Agent",
       "goal": "Responsible for handling claim filing and claim status inquiries for Crestline Insurance for authenticated customers.",
@@ -818,7 +818,7 @@
               "value": null
             }
           },
-          "tool_version": 10,
+          "tool_version": 11,
           "tool_type": "WORKFLOW"
         },
         {
@@ -844,7 +844,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 10,
+          "tool_version": 11,
           "tool_type": "MCP"
         },
         {
@@ -888,14 +888,14 @@
             }
           },
           "output_params": {},
-          "tool_version": 5,
+          "tool_version": 6,
           "tool_type": "MCP"
         }
       ]
     },
     {
       "agent_id": "e0ca36ce-096e-4f4d-b190-3989054039fd",
-      "agent_version": 14,
+      "agent_version": 15,
       "role": "ACTION_AGENT",
       "agent_name": "Vehicle Agent",
       "goal": "Responsible for handling vehicle administration for Crestline\nInsurance for authenticated customers.",
@@ -1035,7 +1035,7 @@
               "value": null
             }
           },
-          "tool_version": 11,
+          "tool_version": 12,
           "tool_type": "WORKFLOW"
         },
         {
@@ -1079,7 +1079,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 5,
+          "tool_version": 6,
           "tool_type": "MCP"
         },
         {
@@ -1105,14 +1105,14 @@
             }
           },
           "output_params": {},
-          "tool_version": 12,
+          "tool_version": 13,
           "tool_type": "MCP"
         }
       ]
     },
     {
       "agent_id": "ec894951-396d-47ac-9f33-a61625a6fce4",
-      "agent_version": 15,
+      "agent_version": 16,
       "role": "ACTION_AGENT",
       "agent_name": "Escalation Agent",
       "goal": "Responsible for handling Crestline Insurance customer requests about billing and new business quotes by gracefully transferring the customer to the appropriate human team with context.",
@@ -1122,7 +1122,7 @@
     },
     {
       "agent_id": "f5044118-885f-4706-b017-197a5989f38c",
-      "agent_version": 18,
+      "agent_version": 19,
       "role": "ACTION_AGENT",
       "agent_name": "Auth Agent",
       "goal": "Responsible for authenticating customers for Crestline Insurance, verifying identity via 6-digit OTP sent to registered phone number, and setting \"authenticated\", \"customer_id\", \"customer_fname\", \"customer_lname\", and \"customer_email\" variables.",
@@ -1390,7 +1390,7 @@
               "value": null
             }
           },
-          "tool_version": 12,
+          "tool_version": 13,
           "tool_type": "WORKFLOW"
         },
         {
@@ -1594,7 +1594,7 @@
               "value": null
             }
           },
-          "tool_version": 17,
+          "tool_version": 18,
           "tool_type": "WORKFLOW"
         },
         {
@@ -1620,7 +1620,7 @@
             }
           },
           "output_params": {},
-          "tool_version": 16,
+          "tool_version": 17,
           "tool_type": "MCP"
         }
       ]
@@ -1629,45 +1629,45 @@
   "links": [
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 18,
+      "source_agent_version": 19,
       "target_agent_id": "620c58ef-0e0c-44ee-bc08-84bcab00a29d",
-      "target_agent_version": 15
+      "target_agent_version": 16
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 18,
+      "source_agent_version": 19,
       "target_agent_id": "6a5ce88a-a7a0-425a-8486-2fea660b182c",
-      "target_agent_version": 10
+      "target_agent_version": 11
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 18,
+      "source_agent_version": 19,
       "target_agent_id": "7abd46f0-1788-48f1-988f-708600062582",
-      "target_agent_version": 7
+      "target_agent_version": 8
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 18,
+      "source_agent_version": 19,
       "target_agent_id": "dce3a76f-e37a-4f45-92ab-0b166223ab17",
-      "target_agent_version": 15
+      "target_agent_version": 16
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 18,
+      "source_agent_version": 19,
       "target_agent_id": "e0ca36ce-096e-4f4d-b190-3989054039fd",
-      "target_agent_version": 14
-    },
-    {
-      "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 18,
-      "target_agent_id": "ec894951-396d-47ac-9f33-a61625a6fce4",
       "target_agent_version": 15
     },
     {
       "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
-      "source_agent_version": 18,
+      "source_agent_version": 19,
+      "target_agent_id": "ec894951-396d-47ac-9f33-a61625a6fce4",
+      "target_agent_version": 16
+    },
+    {
+      "source_agent_id": "c25ba594-93f6-4afd-b059-5f4e814414c8",
+      "source_agent_version": 19,
       "target_agent_id": "f5044118-885f-4706-b017-197a5989f38c",
-      "target_agent_version": 18
+      "target_agent_version": 19
     }
   ],
   "markers": [],
