@@ -10,9 +10,9 @@ Four importable artifacts:
 | File | What it is |
 |---|---|
 | `crestline-ai-agent-system_english.json` | The full 8-agent system (Orchestrator + Auth + Policy + Vehicle + Drivers + Claims + Claims Knowledge + Escalation), exported from Talkdesk AI Agent Platform. |
-| `PC26 Crestline Send SMS Gold - v4.json` | API-triggered Studio flow that sends OTP codes via SMS. The Auth Agent's `send_one_time_pin` workflow tool calls this. |
-| `PC26 Crestline Insurance Voice Gold - v5.json` | Voice Studio flow that hands inbound calls to the AI Agent system and falls back to a ring group on escalation. |
-| `PC26 Crestline Insurance Chat Gold - v2.json` | Chat Studio flow, same pattern as Voice. |
+| `PC26 Crestline Send SMS Gold.json` | API-triggered Studio flow that sends OTP codes via SMS. The Auth Agent's `send_one_time_pin` workflow tool calls this. |
+| `PC26 Crestline Insurance Voice Gold.json` | Voice Studio flow that hands inbound calls to the AI Agent system and falls back to a ring group on escalation. |
+| `PC26 Crestline Insurance Chat Gold.json` | Chat Studio flow, same pattern as Voice. |
 
 `MASTER_DESIGN.md` is the design doc that drives the agent architecture.
 The "Implementation State (2026-04-27)" section near the top documents
@@ -52,7 +52,7 @@ _TODO_
 
 Order matters — there are dependencies between the artifacts.
 
-### 1. Import `PC26 Crestline Send SMS Gold - v4.json`
+### 1. Import `PC26 Crestline Send SMS Gold.json`
 
 This is a standalone API-triggered flow with no dependencies on the
 other artifacts, so import it first.
@@ -62,17 +62,28 @@ other artifacts, so import it first.
   - Open the flow → "Send SMS" step → set the **Outbound sender**
     number to a DID provisioned in your tenant. The committed file
     has `+12178820101` as the Crestline reference value; replace
-    with your number.
-  - Open the **"Add + if needed"** step → re-bind it to the
-    function in your tenant. The committed flow references function
-    ID `8fe1202a5ae840519ea99c6f08987bba`, which is internal to the
-    Crestline tenant. Create an equivalent function (one-line JS
-    that prepends `+` if missing from the input number) and bind
-    this step to it.
-  - **Publish** the flow. Capture its **API trigger URL** — you'll
-    need it in step 2.
+    with your number. Publish the flow.
+  -	After publishing the changes, from Request details, grab the last part of the endpoint URL (e.g. 92557c0280d64f158b836747a5db78d8/interactions) and store for use in a later step.
+  
+  - Go to the Talkdesk Builder and create a new “OAuth Client” with following scopes (flow-definitions:read, flow-definitions:write, flow-resources:read, flows-interactions:start, flows:read). After you complete this step, you will get Client ID and Client Secret. Copy them in a document somewhere for a later step.
+  
+  - In the Talkdesk Builder, create an integration to send SMS using the Studio flow created in the earlier step. Browse Integrations -> Custom Integration.
+  -	Use
+  o	Base path: https://api.talkdeskapp.com/flows
+  o	Authentication type: OAuth2 Client credentials
+  o	Access token url: https://<tenant_name>.talkdeskid.com/oauth/token
+   
+   - Under the newly created integration, create an Action. Use
+      -	Relative path: /e68e3b81dd3d41c7b227e5fa9c404507/interactions (from the Studio flow created earlier)
+      -	url encoding: UTF-8
+      -	Test sending SMS with a sample message using “Test Action”.
+   
 
-### 2. Import `crestline-ai-agent-system_english.json`
+### 2. Create MCP server connections and then Import `crestline-ai-agent-system_US.json`
+
+- In the AI Agent Platform, go to MCP Servers section and create following MCP server connections.
+    -	MCP server for Database.
+    -	MCP server for send email.
 
 The 8-agent system. Depends on the Send SMS Gold flow (step 1) and
 on your tenant's MCP server connections being set up.
@@ -91,20 +102,22 @@ on your tenant's MCP server connections being set up.
   - **Re-bind the `send_one_time_pin` workflow tool** on the Auth
     Agent → point its Connection/Action at the API trigger URL you
     captured from step 1.
-  - **Publish** the agent system. Capture its **endpoint UUID** —
-    you'll need it in steps 3 and 4. The committed Voice/Chat flows
-    use Crestline's endpoint (`cb3669a5-8d0d-49c6-a143-292c667b9494`);
-    yours will be different.
+  - **Publish** the agent system. 
+  
+  - Test the AI Agent using simulator and confirm functionality.
 
-### 3. Import `PC26 Crestline Insurance Voice Gold - v5.json`
+### 3. Import `PC26 Crestline Insurance Voice Gold.json`
 
-Routes inbound voice calls to the AI Agent system. Depends on step 2.
+  - Go to the AI Launchpad and create an Autopilot “Crestline Insurance”.
+
+  - Go to the Autopilots and configure “Crestline Insurance” for Voice channel settings.
+
+  Routes inbound voice calls to the AI Agent system. Depends on the above two bullets.
 
 - **Where:** Talkdesk Studio → Flows → Import flow
-- **Before import:** open the JSON, find the `Autopilot voice` step,
-  replace the `va_parameters.endpoint` UUID
-  (`cb3669a5-8d0d-49c6-a143-292c667b9494`) with the endpoint from
-  step 2.
+
+  - Import the Voice Studio flow; Connect Autopilot Voice to this flow.
+
 - **After import:**
   - Open the **Assignment and dial** step → confirm it points at a
     ring group named `agents`. Create that ring group in your
@@ -114,21 +127,25 @@ Routes inbound voice calls to the AI Agent system. Depends on step 2.
   - Wire it to an inbound number in your Talkdesk tenant's number
     pool.
 
-### 4. Import `PC26 Crestline Insurance Chat Gold - v2.json`
+### 4. Import `PC26 Crestline Insurance Chat Gold.json`
+
+    - Create a chat touchpoint; add the chat widget to the Sample portal and test chat
 
 Routes inbound chat messages to the AI Agent system. Depends on
-step 2. Same pattern as step 3.
+step 2. Same pattern as step 3
 
 - **Where:** Talkdesk Studio → Flows → Import flow
-- **Before import:** open the JSON, find the `Autopilot digital`
-  step, replace the `flow_id` UUID
-  (`cb3669a5-8d0d-49c6-a143-292c667b9494`) with the endpoint from
-  step 2.
+
+  - Connect Autopilot Digital to this flow (in Studio).
+
 - **After import:**
   - Open the **Assign agents to message** step → confirm it points
     at the `agents` ring group.
+
+   - Go to Autopilot digital channel, Create a chat touchpoint; add the chat widget to the Sample portal.
+    
   - **Publish** the flow.
-  - Wire it to a chat channel in your Talkdesk tenant.
+  - Test from your sample portal.
 
 ## Post-import wiring
 
