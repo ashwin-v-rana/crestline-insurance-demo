@@ -16,25 +16,26 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 })
 
 const DEMO_PASSWORD = 'DemoPass123!'
+const ADMIN_PASSWORD = 'CrestlineAdmin123!'
 
 const AGENTS = [
-  { email: 'alice@crestline.com', full_name: 'Alice Anderson', role: 'csr' },
-  { email: 'bob@crestline.com',   full_name: 'Bob Bennett',    role: 'csr' },
-  { email: 'carol@crestline.com', full_name: 'Carol Chen',     role: 'csr' },
-  { email: 'dave@crestline.com',  full_name: 'Dave Davis',     role: 'csr' },
-  { email: 'erin@crestline.com',  full_name: 'Erin Evans',     role: 'supervisor' },
+  { email: 'admin@crestline.com', full_name: 'Crestline Admin', role: 'admin',      password: ADMIN_PASSWORD, must_change_password: true },
+  { email: 'alice@crestline.com', full_name: 'Alice Anderson',  role: 'csr',        password: DEMO_PASSWORD,  must_change_password: false },
+  { email: 'bob@crestline.com',   full_name: 'Bob Bennett',     role: 'csr',        password: DEMO_PASSWORD,  must_change_password: false },
+  { email: 'carol@crestline.com', full_name: 'Carol Chen',      role: 'csr',        password: DEMO_PASSWORD,  must_change_password: false },
+  { email: 'dave@crestline.com',  full_name: 'Dave Davis',      role: 'csr',        password: DEMO_PASSWORD,  must_change_password: false },
+  { email: 'erin@crestline.com',  full_name: 'Erin Evans',      role: 'supervisor', password: DEMO_PASSWORD,  must_change_password: false },
 ]
 
 async function main() {
-  console.log(`Seeding ${AGENTS.length} agents with password: ${DEMO_PASSWORD}\n`)
-
-  const password_hash = await bcrypt.hash(DEMO_PASSWORD, 10)
+  console.log(`Seeding ${AGENTS.length} agents…\n`)
 
   for (const agent of AGENTS) {
+    const password_hash = await bcrypt.hash(agent.password, 10)
     const { error } = await supabase
       .from('agents')
       .upsert(
-        { ...agent, password_hash, must_change_password: false },
+        { email: agent.email, full_name: agent.full_name, role: agent.role, password_hash, must_change_password: agent.must_change_password },
         { onConflict: 'email' },
       )
     if (error) {
@@ -44,8 +45,10 @@ async function main() {
     }
   }
 
-  console.log(`\nDone. Log in with any email above + password '${DEMO_PASSWORD}'.`)
-  console.log("To rotate a password later, run from core/ repo: npm run admin:set-password <email> <new>\n")
+  console.log(`\nDone.`)
+  console.log(`  Admin:  admin@crestline.com / ${ADMIN_PASSWORD}  (must change on first login)`)
+  console.log(`  Agents: alice/bob/carol/dave/erin@crestline.com / ${DEMO_PASSWORD}`)
+  console.log("  To rotate a password later, run from core/ repo: npm run admin:set-password <email> <new>\n")
 }
 
 main().catch((e) => {
