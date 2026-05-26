@@ -17,15 +17,20 @@ swap for their own carrier.
 
 **[crestline-partner-core.vercel.app](https://crestline-partner-core.vercel.app/)**
 
-Demo CSR logins (all use password `DemoPass123!`):
+Demo logins:
 
-| Email | Role |
-|---|---|
-| `alice@crestline.com` | CSR |
-| `bob@crestline.com` | CSR |
-| `carol@crestline.com` | CSR |
-| `dave@crestline.com` | CSR |
-| `erin@crestline.com` | Supervisor |
+| Email | Role | Password | Must change? |
+|---|---|---|---|
+| `admin@crestline.com` | Admin | `CrestlineAdmin123!` | Yes |
+| `alice@crestline.com` | CSR | `DemoPass123!` | No |
+| `bob@crestline.com` | CSR | `DemoPass123!` | No |
+| `carol@crestline.com` | CSR | `DemoPass123!` | No |
+| `dave@crestline.com` | CSR | `DemoPass123!` | No |
+| `erin@crestline.com` | Supervisor | `DemoPass123!` | No |
+
+The admin account is the bootstrap for managing agents via the GUI
+(`/admin/agents` in the CSR Workbench). Log in, change the password,
+then create additional agents from the UI.
 
 ## What's in this repo
 
@@ -118,7 +123,7 @@ order. Detailed steps live in each subdir's README.
    - Apply migrations via Supabase Studio SQL Editor in filename
      order.
    - Run `supabase/seed.sql` for demo personas (~250 rows).
-   - Run `npm run seed:agents` to seed the 5 demo CSR agents.
+   - Run `npm run seed:agents` to seed the 6 demo agents (1 admin + 4 CSRs + 1 supervisor).
 2. **Set up Talkdesk tenant primitives** — [`talkdesk/`](./talkdesk)
    - Create MCP server connections (Supabase, n8n if used).
    - Create a ring group named `agents`.
@@ -133,8 +138,9 @@ order. Detailed steps live in each subdir's README.
    - Set the four required Vercel env vars
      (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
      `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`).
-   - Deploy. Confirm you can log in at the live URL with one of the
-     demo CSR accounts.
+   - Deploy. Log in as `admin@crestline.com` (change password on
+     first login), then use the **Agents** page to manage accounts.
+     Or log in with any demo CSR account to verify the workbench.
 5. **Test end-to-end** — call your Talkdesk inbound number, verify the
    agent answers, walks through OTP, and can update an address or
    file an FNOL against your Supabase project.

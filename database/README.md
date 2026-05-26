@@ -34,36 +34,42 @@ In the Supabase SQL Editor, paste the contents of `supabase/seed.sql` and click 
 ```bash
 cp .env.example .env       # then fill in SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
 npm install
-npm run seed:agents        # creates 5 demo CSR agents
+npm run seed:agents        # creates 6 demo agents (1 admin + 4 CSRs + 1 supervisor)
 ```
 
 The service role key is in the Supabase dashboard → **Project Settings** → **API** → `service_role`. **Never commit `.env`** — it's gitignored.
 
 ### Demo agent credentials (after `npm run seed:agents`)
 
-All 5 share the same password for the demo: `DemoPass123!`. They are seeded with `must_change_password = false` so the canned "log in as alice" demo works without friction.
+| Email | Name | Role | Password | Must change? |
+|---|---|---|---|---|
+| admin@crestline.com | Crestline Admin | admin | `CrestlineAdmin123!` | Yes |
+| alice@crestline.com | Alice Anderson | csr | `DemoPass123!` | No |
+| bob@crestline.com | Bob Bennett | csr | `DemoPass123!` | No |
+| carol@crestline.com | Carol Chen | csr | `DemoPass123!` | No |
+| dave@crestline.com | Dave Davis | csr | `DemoPass123!` | No |
+| erin@crestline.com | Erin Evans | supervisor | `DemoPass123!` | No |
 
-| Email | Name | Role |
-|---|---|---|
-| alice@crestline.com | Alice Anderson | csr |
-| bob@crestline.com | Bob Bennett | csr |
-| carol@crestline.com | Carol Chen | csr |
-| dave@crestline.com | Dave Davis | csr |
-| erin@crestline.com | Erin Evans | supervisor |
+The **admin account** is the bootstrap for agent management. Log in,
+change the password, then use the **Agents** page (`/admin/agents` in
+the CSR Workbench) to create, edit, or remove agents via the GUI.
 
-To rotate a password before sharing the demo (which forces the user to change it again on next login), run from the `core/` repo:
+The demo CSR/supervisor accounts have `must_change_password = false` so
+the canned "log in as alice" demo works without friction.
+
+#### CLI alternatives (run from the `core/` repo)
+
+To rotate a password (forces change on next login):
 
 ```bash
 npm run admin:set-password alice@crestline.com NewPassword123
 ```
 
-To create a new agent (e.g., for a partner engineer):
+To create a new agent without the GUI:
 
 ```bash
 npm run admin:create-agent priya@partner.com "Priya Shah" csr 'TempPass-9k2m'
 ```
-
-The new agent will be required to change their password on first login.
 
 ## Repo layout
 
@@ -87,4 +93,4 @@ After running everything above against a fresh Supabase project, partners have:
 - **17 policies** with realistic effective/expiration dates
 - **15 vehicles**, **11 drivers**, **8 claims** (across various statuses), **9 billing accounts** (some past-due, some current with autopay), **10 payment methods**, **14 payments**
 - **~150 auth events** — populates the Auth Activity dashboard with realistic OTP traffic
-- **5 demo agents** they can log into the CSR app with
+- **6 demo agents** (1 admin + 4 CSRs + 1 supervisor) they can log into the CSR app with — the admin account bootstraps GUI-based agent management
