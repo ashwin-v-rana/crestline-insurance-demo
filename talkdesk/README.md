@@ -95,8 +95,9 @@ on your tenant's MCP server connections being set up.
     Knowledge — 6 agents). The imported `mcp_server_id` references
     Crestline's Talkdesk tenant; replace with your tenant's
     Supabase MCP connection ID.
-  - **Re-bind n8n email MCP connection** on every agent that uses
-    `Call_Send_Email_claims_` (Policy, Vehicle, Drivers, Claims —
+  - **Re-bind the email MCP connection** on every agent that uses
+    `send_email` in the US file, or `Call_Send_Email_claims_` in the
+    other locale files (Policy, Vehicle, Drivers, Claims —
     4 agents). Skip this step if you've removed the email-sending
     sections from the prompts.
   - **Re-bind the `send_one_time_pin` workflow tool** on the Auth
@@ -162,7 +163,7 @@ in Talkdesk after import.
 | Value | Default | Where it appears | When to swap |
 |---|---|---|---|
 | Supabase project ref | `mmcswqvakxkyrmqvwohn` | AI Agent JSON, 6× in `mcp_server_url` for `execute_sql` tools | Before import, or via Talkdesk MCP server settings after |
-| n8n email MCP URL | `https://n8n.srv973863.hstgr.cloud/mcp/a1f5fd5f-…` | AI Agent JSON, 4× in `mcp_server_url` for `Call_Send_Email_claims_` tools | Same |
+| Email MCP URL | US file: `https://mcp.talkdesk-demos.com/mcp`; other locale files: `https://n8n.srv973863.hstgr.cloud/mcp/a1f5fd5f-…` | AI Agent JSON, 4× in `mcp_server_url` for the email tools (`send_email` in US, `Call_Send_Email_claims_` elsewhere) | Same |
 | AI Agent endpoint UUID | `cb3669a5-8d0d-49c6-a143-292c667b9494` | Voice flow (`va_parameters.endpoint`) and Chat flow (`flow_id`), 1× each | Before import — get the new endpoint from publishing the AI Agent system in step 2 |
 | Outbound SMS number | `+12178820101` | Send SMS Gold flow, 1× in the "Send SMS" step's outbound sender | Before import, or via Studio after |
 

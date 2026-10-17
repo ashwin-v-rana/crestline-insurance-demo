@@ -152,7 +152,7 @@ The deployed system uses six tools total across all agents:
 | Tool                       | Type                | Used by                                                              | Purpose |
 |----------------------------|---------------------|----------------------------------------------------------------------|---------|
 | `execute_sql`              | Supabase MCP        | Policy, Vehicle, Drivers, Claims, Claims Knowledge, Auth             | Raw SQL against the partner Supabase project |
-| `Call_Send_Email_claims_`  | n8n MCP             | Policy, Vehicle, Drivers, Claims                                     | Send branded confirmation email after a successful write |
+| `send_email`               | Email MCP           | Policy, Vehicle, Drivers, Claims                                     | Send branded confirmation email after a successful write |
 | `get_customer_context`     | Talkdesk workflow   | Policy, Vehicle, Drivers, Claims, Claims Knowledge                   | Read session vars set by Auth |
 | `set_customer_context`     | Talkdesk workflow   | Auth                                                                 | Persist session vars after successful OTP |
 | `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP and SMS it |
@@ -1832,7 +1832,7 @@ a licensed human. Domain agents must escalate these.
 
 > **Implementation note:** the inventory below is the **target tool
 > set**. The deployed system uses a much smaller set of generic tools
-> (`execute_sql`, `Call_Send_Email_claims_`, `get_customer_context`,
+> (`execute_sql`, `send_email`, `get_customer_context`,
 > `set_customer_context`, `send_one_time_pin`, `search_knowledge_internal`).
 > See "As-built tool inventory" in Implementation State for the
 > current reality.
