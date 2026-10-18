@@ -83,7 +83,8 @@ and chat channels.
 
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
-`Crestline Insurance v2` Talkdesk agent system, version 3, published
+`Crestline_Insurance_GOLDEN_TEMPLATE` Talkdesk agent system (named
+`Crestline Insurance v2` until version 3), version 4, published
 2026-10-18 (exported as `crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
 as forward-looking design. When reality catches up to the design, this
 section gets deleted.
@@ -276,7 +277,7 @@ Only chat is wired up at present (`conversation_settings.enabled = false`).
 All voice-specific guidance in this document (DTMF, silence-fillers,
 spelling phonetically) is target-state.
 
-Session settings in version 3: inactivity timeout 900 s (default and
+Session settings in version 4: inactivity timeout 900 s (default and
 chat), 50 s (voice); the Orchestrator is notified on timeout and on
 hang-up, and hang-up data is compiled and shared. The Orchestrator
 instruction does not yet handle those notifications.
