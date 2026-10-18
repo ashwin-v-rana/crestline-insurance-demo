@@ -101,8 +101,15 @@ on your tenant's MCP server connections being set up.
     4 agents). Skip this step if you've removed the email-sending
     sections from the prompts.
   - **Re-bind the `send_one_time_pin` workflow tool** on the Auth
-    Agent → point its Connection/Action at the API trigger URL you
-    captured from step 1. `verify_otp` needs no connection.
+    Agent. It has two Send SMS steps behind a Split flow:
+    `Send_SMS_US_Number` (used for +1 numbers) and
+    `Send_SMS_UK_Number` (every other number); the names describe the
+    sender. Point `Send_SMS_US_Number` at the Connection/Action for the
+    API trigger URL you captured from step 1. For
+    `Send_SMS_UK_Number`, either set up a second Send SMS flow with a
+    non-US sender and bind it the same way, or bind it to the same
+    action as the US step if you only demo +1 numbers. `verify_otp`
+    needs no connection.
   - **Check the Authentication Gate survived the import.** The
     `authenticated` variable must have **Set as auth condition**
     ticked, and Policy, Claims, Drivers, Vehicle and Claims Knowledge
@@ -111,6 +118,12 @@ on your tenant's MCP server connections being set up.
   - **Workflow edits need Save on every screen** (function step,
     workflow, agent system). Re-open the workflow to confirm a change
     stuck before testing.
+  - **Known Talkdesk issues** (open with Talkdesk engineering): a
+    second wrong OTP code is sometimes rejected with "Duplicate skill
+    call" / "Sorry, I cannot handle your request right now", and
+    sub-agent results reach the Orchestrator as plain text rather
+    than JSON. See "Authentication (as built)" and "Sub-agent
+    hand-off (as built)" in `MASTER_DESIGN.md`.
   - **Publish** the agent system. 
   
   - Test the AI Agent using simulator and confirm functionality.

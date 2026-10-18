@@ -83,8 +83,8 @@ and chat channels.
 
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
-`Crestline Insurance v2` Talkdesk agent system (exported as
-`crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
+`Crestline Insurance v2` Talkdesk agent system, version 3, published
+2026-10-18 (exported as `crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
 as forward-looking design. When reality catches up to the design, this
 section gets deleted.
 
@@ -92,11 +92,11 @@ section gets deleted.
 
 | # | Agent name (in Talkdesk)   | Role               | Scope as deployed |
 |---|----------------------------|--------------------|-------------------|
-| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent `customer_message`, warm-handoff messaging on escalate. Zero business logic. |
+| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Routes on topic without collecting details first. Zero business logic. See "Sub-agent hand-off (as built)". |
 | 2 | **Auth Agent**             | `ACTION_AGENT`     | Phone-based identity verification via 6-digit SMS OTP. The agent never sets session variables itself: the `verify_otp` workflow sets `authenticated` and the four customer variables (`customer_id`, `customer_fname`, `customer_lname`, `customer_email`) only on a matching code. See "Authentication (as built)" below. |
 | 3 | **Policy Agent**           | `ACTION_AGENT`     | **Mailing-address updates only.** Writes `customers.mailing_address` JSONB. Every other request (including physical moves) → `escalate` to `policy_service`. |
 | 4 | **Vehicle Agent**          | `ACTION_AGENT`     | Add / remove vehicle on the active Auto policy. Free-text VIN (no VIN decode). Garaging address collected at add time. Soft-delete on removal. ID card / proof of coverage / replace → escalate. |
-| 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. License number/state optional. No MVR check. Soft-delete on removal. |
+| 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. License number/state optional. No MVR check. Soft-delete on removal; the removal list query excludes the named insured and `self` drivers. Changes to an existing driver's details → escalate at once. |
 | 6 | **Claims Agent**           | `ACTION_AGENT`     | Auto FNOL only. Collects loss date/type/location/description, police report number, and vehicle, then INSERTs into `claims` with a hardcoded adjuster (Sarah Mitchell). Status / Q&A → reroute to Claims Knowledge. Home/Umbrella FNOL → escalate. |
 | 7 | **Claims Knowledge Agent** | `ACTION_AGENT`     | Read-only. Claim status lookup, claim-specific explanations, and general insurance Q&A backed by Talkdesk's `search_knowledge_internal` against the `crestline_claims` segment. |
 | 8 | **Escalation Agent**       | `ACTION_AGENT`     | Stub. Classifies the request as billing or quote, returns `escalate` with `billing_specialist` or `sales_agent` target. No data collection. Stands in for the still-unbuilt Billing and Quote agents. |
@@ -154,7 +154,7 @@ The deployed system uses six tools total across all agents:
 | `execute_sql`              | Supabase MCP        | Policy, Vehicle, Drivers, Claims, Claims Knowledge, Auth             | Raw SQL against the partner Supabase project |
 | `send_email`               | Email MCP           | Policy, Vehicle, Drivers, Claims                                     | Send branded confirmation email after a successful write |
 | `get_customer_context`     | Talkdesk workflow   | Policy, Vehicle, Drivers, Claims, Claims Knowledge                   | Read session vars set by Auth |
-| `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP, SMS it, and stage the looked-up customer in `pending_customer_*` |
+| `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP, SMS it (US sender for +1 numbers, UK sender otherwise), and stage the looked-up customer in `pending_customer_*` |
 | `verify_otp`               | Talkdesk workflow   | Auth                                                                 | Compare the entered code with `sent_pin`; on MATCH set `authenticated = "true"` and copy `pending_customer_*` to `customer_*` |
 | `search_knowledge_internal`| Talkdesk built-in   | Claims Knowledge                                                     | KB search against the `crestline_claims` segment |
 
@@ -180,7 +180,12 @@ OTP flow:
    pending_customer_fname, pending_customer_lname,
    pending_customer_email)` generates the code, writes it to
    `sent_pin`, sends the SMS, and stages the looked-up customer in the
-   four `pending_customer_*` variables. No agent reads those.
+   four `pending_customer_*` variables. No agent reads those. Inside
+   the workflow, the Generate OTP step sets `wf_sms_from_us_number`
+   (`"true"` for 11 digits starting with 1) and a **Split flow** step
+   sends `"true"` to `Send_SMS_US_Number` and the fallback to
+   `Send_SMS_UK_Number`. The step names describe the sender number,
+   not the destination.
 3. `verify_otp(entered_pin)` reads `sent_pin` and
    `pending_customer_cid` from context (they are not model inputs), so
    the model cannot influence the match. On MATCH (6 digits, equal,
@@ -190,7 +195,15 @@ OTP flow:
    `authenticated = "false"`.
 4. Three NO_MATCH results in total (a resend does not reset the count)
    end with `auth_result: failed / max_attempts` and a `lockout` row in
-   `auth_events`.
+   `auth_events`. A new code is only offered after the 1st or 2nd
+   wrong code, so at most 3 codes are sent.
+5. The Auth Agent logs `auth_success`, `lockout` and `auth_failed`
+   (unknown phone number) to `auth_events` with `execute_sql`. Each
+   INSERT step carries the act-don't-narrate guard; without it the
+   model skipped the INSERTs (only one row was written on 2026-10-18
+   before the guard). Individual wrong codes are deliberately not
+   logged: the INSERT would be identical each time and trip the
+   duplicate-skill-call guard.
 
 Talkdesk mechanics this depends on (learned the hard way):
 
@@ -206,9 +219,42 @@ Talkdesk mechanics this depends on (learned the hard way):
   cannot handle your request right now." The Auth Agent therefore
   does not re-call `verify_otp` for a code it already checked, and its
   wrong-code message is phrased as a question so the Orchestrator
-  relays it instead of retrying.
+  relays it instead of retrying. **Known Talkdesk bug (raised with
+  engineering, 2026-10-18):** the guard intermittently also blocks a
+  second `verify_otp` call with a *different* code (456789 after
+  123456). A resend between the calls has worked.
 - Workflow edits in the UI need Save on each screen (function step,
   workflow, agent system) before they persist.
+
+### Sub-agent hand-off (as built)
+
+Section 5 specifies JSON results from sub-agents (`"status":
+"complete"`, `"escalate"` with `escalation_target`, `"reroute"`). In
+every Simulator trace so far, that JSON reaches the Orchestrator as
+**plain text** instead: Auth's `{"auth_result": "success"}` arrives as
+"The user has been authenticated successfully.", a completion arrives
+as just its `customer_message`, and an escalation as a sentence such
+as "...out of scope. Escalating to policy service." Whether the
+platform or the model does this is open with Talkdesk engineering.
+
+The Orchestrator therefore works on meaning, not fields:
+
+- A plain-text completion sentence is delivered word for word, then
+  "Is there anything else I can help you with today?". The closing
+  line is used only after the customer says they're done.
+- A message saying the request is out of scope, can't be handled or
+  should be escalated is treated as an escalation.
+  `policy_service`, `billing_specialist`, `sales_agent` and
+  `system_error` are human teams, never sub-agents, so an escalation
+  is never routed to another agent. With no team named, the
+  policy-specialist message is used.
+
+Known gaps until engineering replies: the handoff line doesn't always
+match the team (billing used the generic "connect you with someone"
+line), and the Orchestrator has once told the customer a request was
+"not in the current automation scope". If structured hand-off isn't
+supported, the fallback is the `verify_otp` pattern: a small workflow
+that sets an orchestration variable such as `escalation_target`.
 
 ### Instruction authoring rules (as built)
 
@@ -218,15 +264,22 @@ Talkdesk mechanics this depends on (learned the hard way):
   an explicit guard ("Do NOT output any message after the write
   succeeds... Your next action is the send_email skill call, in this
   same turn."). Without it the model announces the email instead of
-  sending it.
+  sending it. The same guard is needed on audit-log INSERTs.
+- Out-of-scope requests should escalate before any query or skill
+  call; otherwise the model goes exploring (SQL, built-in tools).
 - Keep each instruction under about 12-14k characters (20k hard
   limit); reliability drops above that.
 
 ### Channel scope
 
-Only chat is wired up at present (`conversation_settings.enabled = false`,
-no voice channel map). All voice-specific guidance in this document
-(DTMF, silence-fillers, spelling phonetically) is target-state.
+Only chat is wired up at present (`conversation_settings.enabled = false`).
+All voice-specific guidance in this document (DTMF, silence-fillers,
+spelling phonetically) is target-state.
+
+Session settings in version 3: inactivity timeout 900 s (default and
+chat), 50 s (voice); the Orchestrator is notified on timeout and on
+hang-up, and hang-up data is compiled and shared. The Orchestrator
+instruction does not yet handle those notifications.
 
 ### Known demo shortcuts
 
@@ -239,12 +292,11 @@ These are deliberate simplifications to keep the demo tight, not bugs:
   the design's Path B logic could automate them.
 - Soft-delete on vehicle/driver removal — the rows stay in the table
   with a status flag rather than being archived to a history table.
-- OTP SMS is validated for US (+1) numbers only. Non-US routing inside
-  `send_one_time_pin` is not wired yet.
+- OTP SMS goes from a US number to +1 numbers and from a UK number to
+  everything else. Tested with US and UK numbers; delivery to other
+  countries depends on the UK sender's international SMS permissions.
 - `send_one_time_pin` returns the plain `sent_pin` in its result, so the
   code is visible in Simulator debug traces for testing.
-- Asking for a new code may be blocked by the duplicate-skill-call
-  guard, since the resend repeats the same inputs.
 
 ---
 
