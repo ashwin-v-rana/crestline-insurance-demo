@@ -9,13 +9,13 @@ Four importable artifacts:
 
 | File | What it is |
 |---|---|
-| `crestline-ai-agent-system_english.json` | The full 8-agent system (Orchestrator + Auth + Policy + Vehicle + Drivers + Claims + Claims Knowledge + Escalation), exported from Talkdesk AI Agent Platform. |
+| `crestline-ai-agent-system_US.json` | The full 8-agent system (Orchestrator + Auth + Policy + Vehicle + Drivers + Claims + Claims Knowledge + Escalation), exported from Talkdesk AI Agent Platform. Uses the Talkdesk Authentication Gate. The `_UK`, `_DE`, `_ES`, `_FR` and `_NL` files are older locale variants that predate the gate. |
 | `PC26 Crestline Send SMS Gold.json` | API-triggered Studio flow that sends OTP codes via SMS. The Auth Agent's `send_one_time_pin` workflow tool calls this. |
 | `PC26 Crestline Insurance Voice Gold.json` | Voice Studio flow that hands inbound calls to the AI Agent system and falls back to a ring group on escalation. |
 | `PC26 Crestline Insurance Chat Gold.json` | Chat Studio flow, same pattern as Voice. |
 
 `MASTER_DESIGN.md` is the design doc that drives the agent architecture.
-The "Implementation State (2026-04-27)" section near the top documents
+The "Implementation State (2026-10-18)" section near the top documents
 what's deployed today vs. what's still target-state.
 
 ## Setup overview
@@ -102,7 +102,15 @@ on your tenant's MCP server connections being set up.
     sections from the prompts.
   - **Re-bind the `send_one_time_pin` workflow tool** on the Auth
     Agent → point its Connection/Action at the API trigger URL you
-    captured from step 1.
+    captured from step 1. `verify_otp` needs no connection.
+  - **Check the Authentication Gate survived the import.** The
+    `authenticated` variable must have **Set as auth condition**
+    ticked, and Policy, Claims, Drivers, Vehicle and Claims Knowledge
+    must be gated. Without this, account data is reachable without an
+    OTP.
+  - **Workflow edits need Save on every screen** (function step,
+    workflow, agent system). Re-open the workflow to confirm a change
+    stuck before testing.
   - **Publish** the agent system. 
   
   - Test the AI Agent using simulator and confirm functionality.

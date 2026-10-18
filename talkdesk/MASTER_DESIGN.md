@@ -79,12 +79,12 @@ and chat channels.
 
 ---
 
-## Implementation State (2026-04-27)
+## Implementation State (2026-10-18)
 
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
-`Crestline_Insurance` Talkdesk agent system (system version 16, draft
-status). Read this first to calibrate expectations, then read the rest
+`Crestline Insurance v2` Talkdesk agent system (exported as
+`crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
 as forward-looking design. When reality catches up to the design, this
 section gets deleted.
 
@@ -93,7 +93,7 @@ section gets deleted.
 | # | Agent name (in Talkdesk)   | Role               | Scope as deployed |
 |---|----------------------------|--------------------|-------------------|
 | 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent `customer_message`, warm-handoff messaging on escalate. Zero business logic. |
-| 2 | **Auth Agent**             | `ACTION_AGENT`     | Phone-based identity verification via 6-digit SMS OTP. Sets four session variables: `customer_id`, `customer_fname`, `customer_lname`, `customer_email`. |
+| 2 | **Auth Agent**             | `ACTION_AGENT`     | Phone-based identity verification via 6-digit SMS OTP. The agent never sets session variables itself: the `verify_otp` workflow sets `authenticated` and the four customer variables (`customer_id`, `customer_fname`, `customer_lname`, `customer_email`) only on a matching code. See "Authentication (as built)" below. |
 | 3 | **Policy Agent**           | `ACTION_AGENT`     | **Mailing-address updates only.** Writes `customers.mailing_address` JSONB. Every other request (including physical moves) → `escalate` to `policy_service`. |
 | 4 | **Vehicle Agent**          | `ACTION_AGENT`     | Add / remove vehicle on the active Auto policy. Free-text VIN (no VIN decode). Garaging address collected at add time. Soft-delete on removal. ID card / proof of coverage / replace → escalate. |
 | 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. License number/state optional. No MVR check. Soft-delete on removal. |
@@ -154,9 +154,73 @@ The deployed system uses six tools total across all agents:
 | `execute_sql`              | Supabase MCP        | Policy, Vehicle, Drivers, Claims, Claims Knowledge, Auth             | Raw SQL against the partner Supabase project |
 | `send_email`               | Email MCP           | Policy, Vehicle, Drivers, Claims                                     | Send branded confirmation email after a successful write |
 | `get_customer_context`     | Talkdesk workflow   | Policy, Vehicle, Drivers, Claims, Claims Knowledge                   | Read session vars set by Auth |
-| `set_customer_context`     | Talkdesk workflow   | Auth                                                                 | Persist session vars after successful OTP |
-| `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP and SMS it |
+| `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP, SMS it, and stage the looked-up customer in `pending_customer_*` |
+| `verify_otp`               | Talkdesk workflow   | Auth                                                                 | Compare the entered code with `sent_pin`; on MATCH set `authenticated = "true"` and copy `pending_customer_*` to `customer_*` |
 | `search_knowledge_internal`| Talkdesk built-in   | Claims Knowledge                                                     | KB search against the `crestline_claims` segment |
+
+### Authentication (as built)
+
+Access to account data is enforced by the Talkdesk **Authentication
+Gate**, not by prompt rules:
+
+- The `authenticated` variable is marked **Set as auth condition**
+  (`is_auth_condition: true`).
+- `security_settings.gated_agents` lists Policy, Claims, Drivers,
+  Vehicle and Claims Knowledge. Until `authenticated` is `"true"`, the
+  platform blocks those agents and returns `STATUS:
+  NEEDS_AUTHENTICATION` to the Orchestrator, which sends the customer
+  to the Auth Agent. No routing rule for this is needed.
+- Orchestrator, Auth and Escalation are not gated.
+
+OTP flow:
+
+1. Auth Agent asks for the phone number, normalizes it to E.164 and
+   looks the customer up with `execute_sql`.
+2. `send_one_time_pin(phone_number, pending_customer_cid,
+   pending_customer_fname, pending_customer_lname,
+   pending_customer_email)` generates the code, writes it to
+   `sent_pin`, sends the SMS, and stages the looked-up customer in the
+   four `pending_customer_*` variables. No agent reads those.
+3. `verify_otp(entered_pin)` reads `sent_pin` and
+   `pending_customer_cid` from context (they are not model inputs), so
+   the model cannot influence the match. On MATCH (6 digits, equal,
+   pending cid present) it sets `otp_result = "MATCH"`,
+   `authenticated = "true"` and copies `pending_customer_*` to
+   `customer_*`. Otherwise it returns `NO_MATCH` and
+   `authenticated = "false"`.
+4. Three NO_MATCH results in total (a resend does not reset the count)
+   end with `auth_result: failed / max_attempts` and a `lockout` row in
+   `auth_events`.
+
+Talkdesk mechanics this depends on (learned the hard way):
+
+- A workflow persists a variable only when a workflow-local variable
+  (e.g. `wf_authenticated`) is mapped to it in the **End flow** block.
+  A direct `Context.setVariable("authenticated", ...)` does not reach
+  the orchestration variable.
+- The gate opens only on the string `"true"`.
+- A workflow can read an orchestration variable with
+  `Context.getVariable` without taking it as an input.
+- Talkdesk blocks a repeated call to the same skill with the same
+  input ("Duplicate skill call") and ends the turn with "Sorry, I
+  cannot handle your request right now." The Auth Agent therefore
+  does not re-call `verify_otp` for a code it already checked, and its
+  wrong-code message is phrased as a question so the Orchestrator
+  relays it instead of retrying.
+- Workflow edits in the UI need Save on each screen (function step,
+  workflow, agent system) before they persist.
+
+### Instruction authoring rules (as built)
+
+- **ASCII only.** The model (GPT-4.1-mini) garbles non-ASCII glyphs.
+  Use `-` and `->`, never em dashes, arrows or box-drawing dividers.
+- **Act, don't narrate.** Write steps that end in a skill call carry
+  an explicit guard ("Do NOT output any message after the write
+  succeeds... Your next action is the send_email skill call, in this
+  same turn."). Without it the model announces the email instead of
+  sending it.
+- Keep each instruction under about 12-14k characters (20k hard
+  limit); reliability drops above that.
 
 ### Channel scope
 
@@ -175,6 +239,12 @@ These are deliberate simplifications to keep the demo tight, not bugs:
   the design's Path B logic could automate them.
 - Soft-delete on vehicle/driver removal — the rows stay in the table
   with a status flag rather than being archived to a history table.
+- OTP SMS is validated for US (+1) numbers only. Non-US routing inside
+  `send_one_time_pin` is not wired yet.
+- `send_one_time_pin` returns the plain `sent_pin` in its result, so the
+  code is visible in Simulator debug traces for testing.
+- Asking for a new code may be blocked by the duplicate-skill-call
+  guard, since the resend repeats the same inputs.
 
 ---
 
@@ -1833,7 +1903,7 @@ a licensed human. Domain agents must escalate these.
 > **Implementation note:** the inventory below is the **target tool
 > set**. The deployed system uses a much smaller set of generic tools
 > (`execute_sql`, `send_email`, `get_customer_context`,
-> `set_customer_context`, `send_one_time_pin`, `search_knowledge_internal`).
+> `send_one_time_pin`, `verify_otp`, `search_knowledge_internal`).
 > See "As-built tool inventory" in Implementation State for the
 > current reality.
 
