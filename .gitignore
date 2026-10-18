@@ -1,0 +1,2 @@
+# Local secrets, ignored in every directory
+.env.local
