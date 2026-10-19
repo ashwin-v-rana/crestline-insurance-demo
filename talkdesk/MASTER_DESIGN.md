@@ -79,13 +79,13 @@ and chat channels.
 
 ---
 
-## Implementation State (2026-10-18)
+## Implementation State (2026-10-19)
 
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
 `Crestline_Insurance_GOLDEN_TEMPLATE` Talkdesk agent system (named
-`Crestline Insurance v2` until version 3), version 4, published
-2026-10-18 (exported as `crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
+`Crestline Insurance v2` until version 3), version 5, published
+2026-10-19 (exported as `crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
 as forward-looking design. When reality catches up to the design, this
 section gets deleted.
 
@@ -93,9 +93,9 @@ section gets deleted.
 
 | # | Agent name (in Talkdesk)   | Role               | Scope as deployed |
 |---|----------------------------|--------------------|-------------------|
-| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Routes on topic without collecting details first. Zero business logic. See "Sub-agent hand-off (as built)". |
+| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Never writes its own questions; passes the customer's answer back to the sub-agent that asked, even if partial. Routes on topic without collecting details first, restating every detail of the request. Zero business logic. See "Sub-agent hand-off (as built)". |
 | 2 | **Auth Agent**             | `ACTION_AGENT`     | Phone-based identity verification via 6-digit SMS OTP. The agent never sets session variables itself: the `verify_otp` workflow sets `authenticated` and the four customer variables (`customer_id`, `customer_fname`, `customer_lname`, `customer_email`) only on a matching code. See "Authentication (as built)" below. |
-| 3 | **Policy Agent**           | `ACTION_AGENT`     | **Mailing-address updates only.** Writes `customers.mailing_address` JSONB. Every other request (including physical moves) → `escalate` to `policy_service`. |
+| 3 | **Policy Agent**           | `ACTION_AGENT`     | **Mailing-address updates only.** Asks "mail or moving?" only when the request doesn't say, and at most once. Collects the whole address in one question, then asks only for missing fields; converts state names itself; a "no" at the read-back fixes only the wrong field. Writes `customers.mailing_address` JSONB. Every other request (including physical moves) → `escalate` to `policy_service`. |
 | 4 | **Vehicle Agent**          | `ACTION_AGENT`     | Add / remove vehicle on the active Auto policy. Free-text VIN (no VIN decode). Garaging address collected at add time. Soft-delete on removal. ID card / proof of coverage / replace → escalate. |
 | 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. License number/state optional. No MVR check. Soft-delete on removal; the removal list query excludes the named insured and `self` drivers. Changes to an existing driver's details → escalate at once. |
 | 6 | **Claims Agent**           | `ACTION_AGENT`     | Auto FNOL only. Collects loss date/type/location/description, police report number, and vehicle, then INSERTs into `claims` with a hardcoded adjuster (Sarah Mitchell). Status / Q&A → reroute to Claims Knowledge. Home/Umbrella FNOL → escalate. |
@@ -240,6 +240,18 @@ platform or the model does this is open with Talkdesk engineering.
 
 The Orchestrator therefore works on meaning, not fields:
 
+- Two rules sit at the top of its instruction (ported from the Wren
+  restaurant system, 2026-10-19): it never writes its own questions,
+  and the customer's answer goes back to the sub-agent that asked, in
+  the same turn and unchanged, even if it is only part of what was
+  asked. Before this, the Orchestrator judged a partial address
+  incomplete and asked for the full address itself, so the Policy
+  Agent never saw the reply.
+- Sub-agents see only the Orchestrator's message to them, so every
+  routing message restates the details the customer gave for this
+  request (e.g. an address in the opening message). Details of a task
+  already completed are not carried into a new one.
+
 - A plain-text completion sentence is delivered word for word, then
   "Is there anything else I can help you with today?". The closing
   line is used only after the customer says they're done.
@@ -270,6 +282,12 @@ that sets an orchestration variable such as `escalation_target`.
   call; otherwise the model goes exploring (SQL, built-in tools).
 - Keep each instruction under about 12-14k characters (20k hard
   limit); reliability drops above that.
+- **Positive examples only.** Never quote a wrong output as a "WRONG"
+  example; the model reproduces it (seen in the Wren system).
+- **Don't let the model decide what the customer meant to reject.**
+  The Policy Agent rejected "Texas" as "not 2 letters" until the
+  instruction said to convert full names itself and never ask the
+  customer to reformat.
 
 ### Channel scope
 
@@ -277,7 +295,7 @@ Only chat is wired up at present (`conversation_settings.enabled = false`).
 All voice-specific guidance in this document (DTMF, silence-fillers,
 spelling phonetically) is target-state.
 
-Session settings in version 4: inactivity timeout 900 s (default and
+Session settings in version 5: inactivity timeout 900 s (default and
 chat), 50 s (voice); the Orchestrator is notified on timeout and on
 hang-up, and hang-up data is compiled and shared. The Orchestrator
 instruction does not yet handle those notifications.
