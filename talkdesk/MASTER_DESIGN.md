@@ -84,7 +84,7 @@ and chat channels.
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
 `Crestline_Insurance_GOLDEN_TEMPLATE` Talkdesk agent system (named
-`Crestline Insurance v2` until version 3), version 5, published
+`Crestline Insurance v2` until version 3), version 6, published
 2026-10-19 (exported as `crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
 as forward-looking design. When reality catches up to the design, this
 section gets deleted.
@@ -93,10 +93,10 @@ section gets deleted.
 
 | # | Agent name (in Talkdesk)   | Role               | Scope as deployed |
 |---|----------------------------|--------------------|-------------------|
-| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Never writes its own questions; passes the customer's answer back to the sub-agent that asked, even if partial. Routes on topic without collecting details first, restating every detail of the request. Zero business logic. See "Sub-agent hand-off (as built)". |
+| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Never writes its own questions; passes the customer's answer back to the sub-agent that asked, even if partial; a sub-agent's question (including a read-back) always goes to the customer, never back to a sub-agent. Routes on topic without collecting details first, restating every detail of the request. Zero business logic. See "Sub-agent hand-off (as built)". |
 | 2 | **Auth Agent**             | `ACTION_AGENT`     | Phone-based identity verification via 6-digit SMS OTP. The agent never sets session variables itself: the `verify_otp` workflow sets `authenticated` and the four customer variables (`customer_id`, `customer_fname`, `customer_lname`, `customer_email`) only on a matching code. See "Authentication (as built)" below. |
 | 3 | **Policy Agent**           | `ACTION_AGENT`     | **Mailing-address updates only.** Asks "mail or moving?" only when the request doesn't say, and at most once. Collects the whole address in one question, then asks only for missing fields; converts state names itself; a "no" at the read-back fixes only the wrong field. Writes `customers.mailing_address` JSONB. Every other request (including physical moves) → `escalate` to `policy_service`. |
-| 4 | **Vehicle Agent**          | `ACTION_AGENT`     | Add / remove vehicle on the active Auto policy. Free-text VIN (no VIN decode). Garaging address collected at add time. Soft-delete on removal. ID card / proof of coverage / replace → escalate. |
+| 4 | **Vehicle Agent**          | `ACTION_AGENT`     | Add / remove vehicle on the active Auto policy. Year, make and model in one question (or taken from the request); free-text VIN (no VIN decode). Offers the mailing address as the garaging address, otherwise one address question; the read-back is always its own question and only the customer's own yes saves. Soft-delete on removal. ID card / proof of coverage / replace → escalate. |
 | 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. License number/state optional. No MVR check. Soft-delete on removal; the removal list query excludes the named insured and `self` drivers. Changes to an existing driver's details → escalate at once. |
 | 6 | **Claims Agent**           | `ACTION_AGENT`     | Auto FNOL only. Collects loss date/type/location/description, police report number, and vehicle, then INSERTs into `claims` with a hardcoded adjuster (Sarah Mitchell). Status / Q&A → reroute to Claims Knowledge. Home/Umbrella FNOL → escalate. |
 | 7 | **Claims Knowledge Agent** | `ACTION_AGENT`     | Read-only. Claim status lookup, claim-specific explanations, and general insurance Q&A backed by Talkdesk's `search_knowledge_internal` against the `crestline_claims` segment. |
@@ -153,7 +153,7 @@ The deployed system uses six tools total across all agents:
 | Tool                       | Type                | Used by                                                              | Purpose |
 |----------------------------|---------------------|----------------------------------------------------------------------|---------|
 | `execute_sql`              | Supabase MCP        | Policy, Vehicle, Drivers, Claims, Claims Knowledge, Auth             | Raw SQL against the partner Supabase project |
-| `send_email`               | Email MCP           | Policy, Vehicle, Drivers, Claims                                     | Send branded confirmation email after a successful write |
+| `send_email`               | Email MCP           | Policy, Vehicle, Drivers, Claims                                     | Send branded confirmation email after a successful write; `to` is bound to `customer_email` |
 | `get_customer_context`     | Talkdesk workflow   | Policy, Vehicle, Drivers, Claims, Claims Knowledge                   | Read session vars set by Auth |
 | `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP, SMS it (US sender for +1 numbers, UK sender otherwise), and stage the looked-up customer in `pending_customer_*` |
 | `verify_otp`               | Talkdesk workflow   | Auth                                                                 | Compare the entered code with `sent_pin`; on MATCH set `authenticated = "true"` and copy `pending_customer_*` to `customer_*` |
@@ -227,6 +227,33 @@ Talkdesk mechanics this depends on (learned the hard way):
 - Workflow edits in the UI need Save on each screen (function step,
   workflow, agent system) before they persist.
 
+### Customer identity in sub-agents (as built)
+
+Talkdesk has no `{{variable}}` substitution in sub-agent instructions,
+so a sub-agent knows the customer only by calling
+`get_customer_context`. On 2026-10-19 the Vehicle Agent skipped that
+call and wrote `customer_id = (SELECT cid FROM customers LIMIT 1)`,
+showing another customer's address and vehicles (nothing was
+written). Defences in version 6:
+
+- **Customer ID rule** at the top of Policy, Vehicle, Drivers, Claims
+  and Claims Knowledge: the first action on every call is
+  `get_customer_context`, and every SQL statement names the customer
+  only by that `customer_id` as a quoted literal - never a subquery, a
+  search of `customers`, `LIMIT` or a remembered value. This is a
+  prompt rule, so it reduces the risk rather than removing it.
+- **Email recipient:** each `send_email` tool's `to` input is bound to
+  `customer_email` (set only by `verify_otp`), and agents take the
+  address only from `get_customer_context`, never from SQL. Tests
+  showed a bound input is filled from the variable once a skill has
+  loaded it in that run (it arrived empty when the context call was
+  skipped), so a skipped call fails the email instead of sending it
+  to another customer.
+- The deterministic fix still to build: workflows that query the
+  database with `customer_id` read from the context (as
+  `verify_otp` does for the code), so the model never handles the
+  customer ID.
+
 ### Sub-agent hand-off (as built)
 
 Section 5 specifies JSON results from sub-agents (`"status":
@@ -295,7 +322,7 @@ Only chat is wired up at present (`conversation_settings.enabled = false`).
 All voice-specific guidance in this document (DTMF, silence-fillers,
 spelling phonetically) is target-state.
 
-Session settings in version 5: inactivity timeout 900 s (default and
+Session settings in version 6: inactivity timeout 900 s (default and
 chat), 50 s (voice); the Orchestrator is notified on timeout and on
 hang-up, and hang-up data is compiled and shared. The Orchestrator
 instruction does not yet handle those notifications.
