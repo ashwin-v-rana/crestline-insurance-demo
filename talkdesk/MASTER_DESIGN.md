@@ -244,15 +244,51 @@ written). Defences in version 6:
   prompt rule, so it reduces the risk rather than removing it.
 - **Email recipient:** each `send_email` tool's `to` input is bound to
   `customer_email` (set only by `verify_otp`), and agents take the
-  address only from `get_customer_context`, never from SQL. Tests
-  showed a bound input is filled from the variable once a skill has
-  loaded it in that run (it arrived empty when the context call was
-  skipped), so a skipped call fails the email instead of sending it
-  to another customer.
-- The deterministic fix still to build: workflows that query the
-  database with `customer_id` read from the context (as
-  `verify_otp` does for the code), so the model never handles the
-  customer ID.
+  address only from `get_customer_context`, never from SQL. The
+  binding is a default, not an enforcement (see the Option A test
+  below): the recipient is right because the instruction takes it
+  from `get_customer_context`, so this is also a prompt-level
+  defence.
+
+**Option A test - binding a workflow-built query (2026-10-20, failed).**
+The idea: a workflow reads `customer_id` from the context and builds
+the SQL; `execute_sql`'s `query` input is bound to the variable the
+workflow fills, so the model's own SQL would never run. Tested in the
+v7 draft on the Policy Agent: a no-input workflow `build_test_sql`
+(function step reads `customer_id`, builds a `SELECT` marked
+`WORKFLOW_QUERY`, End-flow maps it to a new variable `safe_sql`), and
+Policy's `execute_sql.query` rebound from `sql_query` to `safe_sql`.
+The test section ran a model-written `SELECT 'MODEL_BEFORE'`, then
+`build_test_sql`, then a model-written `SELECT 'MODEL_AFTER'`.
+
+- `build_test_sql` filled `safe_sql` correctly, with the customer's
+  ID as a literal.
+- Both `execute_sql` calls ran the **model's** query
+  (`MODEL_BEFORE`, `MODEL_AFTER`). A real address-change `UPDATE`
+  written by the model also ran with the binding in place.
+- Conclusion: a bound tool input is only a default. Once the model
+  writes a value, that value is used, whether or not a skill has
+  filled the variable. A workflow cannot force `execute_sql` to run
+  its SQL. The test was reverted; v7 matches published v6.
+
+**Option B - for future consideration.** The deterministic fix is to
+take the SQL away from the model entirely: one workflow skill per
+operation (for example `list_vehicles`, `add_vehicle`,
+`remove_vehicle`, `update_mailing_address`). The model passes only
+business values (year/make/model, address fields, the chosen
+vehicle id); the workflow reads `customer_id` from the context and
+calls a Builder custom-integration Action (the same mechanism as
+Send SMS) that posts to Supabase's REST RPC endpoint
+(`/rest/v1/rpc/<function>`). Postgres functions that take `p_cid`
+check ownership themselves and use typed parameters, so there is no
+SQL injection either. Costs: a migration with the functions, a
+Builder integration with a Supabase API key plus one Action per
+function, one workflow per operation built in the UI, the
+workflow limits (String/Number variables, at most 15 per workflow)
+and the duplicate-skill-call guard on repeated identical calls.
+Gated agents would lose `execute_sql`; Auth keeps it for the phone
+lookup. Not scheduled; until then the customer ID rule is the
+defence.
 
 ### Sub-agent hand-off (as built)
 
