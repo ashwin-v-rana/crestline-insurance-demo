@@ -425,8 +425,9 @@ These are deliberate simplifications to keep the demo tight, not bugs:
 - Soft-delete on vehicle/driver removal — the rows stay in the table
   with a status flag rather than being archived to a history table.
 - OTP SMS goes from a US number to +1 numbers and from a UK number to
-  everything else. Tested with US and UK numbers; delivery to other
-  countries depends on the UK sender's international SMS permissions.
+  everything else. Tested with US, UK and Brazil (+55, via the UK
+  sender) numbers; delivery to other countries depends on the UK
+  sender's international SMS permissions.
 - `send_one_time_pin` returns the plain `sent_pin` in its result, so the
   code is visible in Simulator debug traces for testing.
 
