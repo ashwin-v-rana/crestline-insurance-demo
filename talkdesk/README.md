@@ -115,6 +115,12 @@ on your tenant's MCP server connections being set up.
     ticked, and Policy, Claims, Drivers, Vehicle and Claims Knowledge
     must be gated. Without this, account data is reachable without an
     OTP.
+  - **Check the human handoff output.** The Escalation Agent's
+    `Load Transfer Data` workflow writes the human agent's brief to
+    `Transfer Data`, which must be set as the agent system's
+    Application Output. Confirm your Studio flow's escalation branch
+    shows it to the human agent. See "Human handoff (as built)" in
+    `MASTER_DESIGN.md`.
   - **Workflow edits need Save on every screen** (function step,
     workflow, agent system). Re-open the workflow to confirm a change
     stuck before testing.

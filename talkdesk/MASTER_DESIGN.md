@@ -79,13 +79,15 @@ and chat channels.
 
 ---
 
-## Implementation State (2026-10-19)
+## Implementation State (2026-10-20)
 
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
 `Crestline_Insurance_GOLDEN_TEMPLATE` Talkdesk agent system (named
-`Crestline Insurance v2` until version 3), version 6, published
-2026-10-19 (exported as `crestline-ai-agent-system_US.json`). Read this first to calibrate expectations, then read the rest
+`Crestline Insurance v2` until version 3), version 22, published
+2026-10-21 UTC (exported as `crestline-ai-agent-system_US.json`).
+Version 22 is version 21 (the human-handoff redesign, 2026-10-20) plus
+the Authentication Gate restored on Drivers and Claims Knowledge. Read this first to calibrate expectations, then read the rest
 as forward-looking design. When reality catches up to the design, this
 section gets deleted.
 
@@ -93,23 +95,24 @@ section gets deleted.
 
 | # | Agent name (in Talkdesk)   | Role               | Scope as deployed |
 |---|----------------------------|--------------------|-------------------|
-| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Never writes its own questions; passes the customer's answer back to the sub-agent that asked, even if partial; a sub-agent's question (including a read-back) always goes to the customer, never back to a sub-agent. Routes on topic without collecting details first, restating every detail of the request. Zero business logic. See "Sub-agent hand-off (as built)". |
+| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Never writes its own questions; passes the customer's answer back to the sub-agent that asked, even if partial; a sub-agent's question (including a read-back) always goes to the customer, never back to a sub-agent. Routes on topic without collecting details first, restating every detail of the request. Sends every escalation through the Escalation Agent, then ends the conversation with `transfer_to_human`. Zero business logic. See "Sub-agent hand-off (as built)" and "Human handoff (as built)". |
 | 2 | **Auth Agent**             | `ACTION_AGENT`     | Phone-based identity verification via 6-digit SMS OTP. The agent never sets session variables itself: the `verify_otp` workflow sets `authenticated` and the four customer variables (`customer_id`, `customer_fname`, `customer_lname`, `customer_email`) only on a matching code. See "Authentication (as built)" below. |
 | 3 | **Policy Agent**           | `ACTION_AGENT`     | **Mailing-address updates only.** Asks "mail or moving?" only when the request doesn't say, and at most once. Collects the whole address in one question, then asks only for missing fields; converts state names itself; a "no" at the read-back fixes only the wrong field. Writes `customers.mailing_address` JSONB. Every other request (including physical moves) → `escalate` to `policy_service`. |
 | 4 | **Vehicle Agent**          | `ACTION_AGENT`     | Add / remove vehicle on the active Auto policy. Year, make and model in one question (or taken from the request); free-text VIN (no VIN decode). Offers the mailing address as the garaging address, otherwise one address question; the read-back is always its own question and only the customer's own yes saves. Soft-delete on removal. ID card / proof of coverage / replace → escalate. |
 | 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. License number/state optional. No MVR check. Soft-delete on removal; the removal list query excludes the named insured and `self` drivers. Changes to an existing driver's details → escalate at once. |
 | 6 | **Claims Agent**           | `ACTION_AGENT`     | Auto FNOL only. Collects loss date/type/location/description, police report number, and vehicle, then INSERTs into `claims` with a hardcoded adjuster (Sarah Mitchell). Status / Q&A → reroute to Claims Knowledge. Home/Umbrella FNOL → escalate. |
 | 7 | **Claims Knowledge Agent** | `ACTION_AGENT`     | Read-only. Claim status lookup, claim-specific explanations, and general insurance Q&A backed by Talkdesk's `search_knowledge_internal` against the `crestline_claims` segment. |
-| 8 | **Escalation Agent**       | `ACTION_AGENT`     | Stub. Classifies the request as billing or quote, returns `escalate` with `billing_specialist` or `sales_agent` target. No data collection. Stands in for the still-unbuilt Billing and Quote agents. |
+| 8 | **Escalation Agent**       | `ACTION_AGENT`     | Prepares every human handoff; never speaks to the customer. Uses the team the Orchestrator names, or classifies billing → `billing_specialist`, quote → `sales_agent`, anything else → `human_request`. Reads the session with `get_customer_context`, builds the human agent's brief with `Load Transfer Data`, and returns `transfer_ready` (or `transfer_error`). Stands in for the still-unbuilt Billing and Quote agents. |
 
 ### What the design specifies but isn't built
 
 - **Billing Agent** (entire section 11) — not built. Billing requests
-  route to the Escalation Agent stub, which warm-transfers to a human
-  `billing_specialist`. None of the billing tools (`get_billing_summary`,
+  route to the Escalation Agent, which prepares a warm transfer to a
+  human `billing_specialist`. None of the billing tools (`get_billing_summary`,
   `process_payment`, `update_autopay`, etc.) exist.
 - **Quote Agent** (entire section 12) — not built. Quote requests route
-  to the Escalation Agent stub, which warm-transfers to a `sales_agent`.
+  to the Escalation Agent, which prepares a warm transfer to a
+  `sales_agent`.
   No `generate_auto_quote`, `vin_decode`, or `save_quote` tools exist.
 - **Step-up authentication** — `requires_step_up_auth` status is
   defined in the contract (section 5b) but no deployed agent ever
@@ -148,13 +151,15 @@ config, no graceful-degradation default.
 
 ### As-built tool inventory
 
-The deployed system uses six tools total across all agents:
+The deployed system uses seven tools across the sub-agents, plus the
+Orchestrator's built-in `transfer_to_human`:
 
 | Tool                       | Type                | Used by                                                              | Purpose |
 |----------------------------|---------------------|----------------------------------------------------------------------|---------|
 | `execute_sql`              | Supabase MCP        | Policy, Vehicle, Drivers, Claims, Claims Knowledge, Auth             | Raw SQL against the partner Supabase project |
 | `send_email`               | Email MCP           | Policy, Vehicle, Drivers, Claims                                     | Send branded confirmation email after a successful write; `to` is bound to `customer_email` |
-| `get_customer_context`     | Talkdesk workflow   | Policy, Vehicle, Drivers, Claims, Claims Knowledge                   | Read session vars set by Auth |
+| `get_customer_context`     | Talkdesk workflow   | Policy, Vehicle, Drivers, Claims, Claims Knowledge, Escalation       | Read session vars set by Auth |
+| `Load Transfer Data`       | Talkdesk workflow   | Escalation                                                           | Build the human agent's brief and write it to `Transfer Data`, the system's Application Output |
 | `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP, SMS it (US sender for +1 numbers, UK sender otherwise), and stage the looked-up customer in `pending_customer_*` |
 | `verify_otp`               | Talkdesk workflow   | Auth                                                                 | Compare the entered code with `sent_pin`; on MATCH set `authenticated = "true"` and copy `pending_customer_*` to `customer_*` |
 | `search_knowledge_internal`| Talkdesk built-in   | Claims Knowledge                                                     | KB search against the `crestline_claims` segment |
@@ -172,6 +177,10 @@ Gate**, not by prompt rules:
   NEEDS_AUTHENTICATION` to the Orchestrator, which sends the customer
   to the Auth Agent. No routing rule for this is needed.
 - Orchestrator, Auth and Escalation are not gated.
+- Re-check the gated list after any UI rework. During the 2026-10-20
+  handoff work it went to empty, then to Policy, Claims and Vehicle
+  only (published v8-v21); Drivers and Claims Knowledge were restored
+  in v22.
 
 OTP flow:
 
@@ -319,18 +328,59 @@ The Orchestrator therefore works on meaning, not fields:
   "Is there anything else I can help you with today?". The closing
   line is used only after the customer says they're done.
 - A message saying the request is out of scope, can't be handled or
-  should be escalated is treated as an escalation.
-  `policy_service`, `billing_specialist`, `sales_agent` and
-  `system_error` are human teams, never sub-agents, so an escalation
-  is never routed to another agent. With no team named, the
-  policy-specialist message is used.
+  should be escalated is treated as an escalation and goes to the
+  Escalation Agent (see "Human handoff (as built)"). The human teams
+  are never sub-agents, so no other agent receives an escalation.
 
-Known gaps until engineering replies: the handoff line doesn't always
-match the team (billing used the generic "connect you with someone"
-line), and the Orchestrator has once told the customer a request was
-"not in the current automation scope". If structured hand-off isn't
-supported, the fallback is the `verify_otp` pattern: a small workflow
-that sets an orchestration variable such as `escalation_target`.
+Known gap until engineering replies: before the 2026-10-20 handoff
+redesign, the handoff line didn't always match the team, and the
+Orchestrator once told the customer a request was "not in the current
+automation scope". The redesign gives the Orchestrator one verbatim
+line per team; re-test before relying on it.
+
+### Human handoff (as built)
+
+Added 2026-10-20 (published v21). Every escalation follows one path:
+
+1. **Orchestrator → Escalation Agent, silently.** Triggers: the
+   customer asks for a person, a billing or new-quote request, or a
+   sub-agent escalating. The Orchestrator says nothing to the customer
+   yet. It passes an `escalation_target` when one is known, plus two
+   labelled lines built from the conversation:
+   `Interaction summary` = `ISSUE: ... || ACTIONS: ...` and
+   `Transfer reason` = `TEAM: ... || NEXT ACTION: ...`. No UUIDs, agent
+   names or placeholder customer details.
+2. **Escalation Agent.** Picks the team (the named target, else
+   billing → `billing_specialist`, quote → `sales_agent`, else
+   `human_request`), calls `get_customer_context`, then
+   `Load Transfer Data` with those values. It returns
+   `{"status":"transfer_ready","escalation_target":...}` only when the
+   workflow's `transfer_data` output is non-empty, otherwise
+   `transfer_error`. It never speaks, runs SQL or transfers.
+3. **`Load Transfer Data` workflow.** Clears `Transfer Data`, then
+   builds `CUSTOMER / CONTACT / ISSUE / COMPLETED / TEAM / NEXT ACTION`
+   joined by `||`. Name, phone and email are included only when
+   `authenticated` is `"true"`; otherwise CUSTOMER reads "Unverified
+   caller | Verify identity before discussing account details". UUIDs
+   are stripped. It writes `Transfer Data`, `Interaction summary` and
+   `Transfer reason`. `Transfer Data` is the agent system's
+   **Application Output**, which reaches the human agent through
+   Studio.
+4. **Orchestrator → `transfer_to_human`.** After `transfer_ready` (one
+   `CONTINUE` retry on prose or `transfer_error`; still failing → the
+   `system_error` line), it calls `transfer_to_human` with the team's
+   verbatim line as the message. That call ends the conversation; the
+   Orchestrator does not use `reply_to_user` for a handoff.
+
+Teams and lines: `billing_specialist`, `sales_agent`, `policy_service`,
+`claims_intake`, `human_request`, `system_error` (and an extra
+`quote_request` line that no rule currently produces). With no team
+named, the `policy_service` line is used.
+
+New custom variables: `Transfer Data`, `Transfer reason`,
+`Interaction summary`. The design follows the Wren system's
+pre-escalation pattern. The Orchestrator instruction grew to about
+15.5k characters, above the 12-14k guideline below.
 
 ### Instruction authoring rules (as built)
 
@@ -358,7 +408,7 @@ Only chat is wired up at present (`conversation_settings.enabled = false`).
 All voice-specific guidance in this document (DTMF, silence-fillers,
 spelling phonetically) is target-state.
 
-Session settings in version 6: inactivity timeout 900 s (default and
+Session settings in version 22: inactivity timeout 900 s (default and
 chat), 50 s (voice); the Orchestrator is notified on timeout and on
 hang-up, and hang-up data is compiled and shared. The Orchestrator
 instruction does not yet handle those notifications.
