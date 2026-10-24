@@ -84,10 +84,12 @@ and chat channels.
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
 `Crestline_Insurance_GOLDEN_TEMPLATE` Talkdesk agent system (named
-`Crestline Insurance v2` until version 3), version 22, published
-2026-10-21 UTC (exported as `crestline-ai-agent-system_US.json`).
-Version 22 is version 21 (the human-handoff redesign, 2026-10-20) plus
-the Authentication Gate restored on Drivers and Claims Knowledge. Read this first to calibrate expectations, then read the rest
+`Crestline Insurance v2` until version 3), version 23, published
+2026-10-24 UTC (exported as `crestline-ai-agent-system_US.json`).
+Version 23 is version 22 plus the OTP lockout fix: `verify_otp` now
+counts wrong codes itself and returns `LOCKED`. Version 22 was version
+21 (the human-handoff redesign, 2026-10-20) plus the Authentication
+Gate restored on Drivers and Claims Knowledge. Read this first to calibrate expectations, then read the rest
 as forward-looking design. When reality catches up to the design, this
 section gets deleted.
 
@@ -161,7 +163,7 @@ Orchestrator's built-in `transfer_to_human`:
 | `get_customer_context`     | Talkdesk workflow   | Policy, Vehicle, Drivers, Claims, Claims Knowledge, Escalation       | Read session vars set by Auth |
 | `Load Transfer Data`       | Talkdesk workflow   | Escalation                                                           | Build the human agent's brief and write it to `Transfer Data`, the system's Application Output |
 | `send_one_time_pin`        | Talkdesk workflow   | Auth                                                                 | Generate a 6-digit OTP, SMS it (US sender for +1 numbers, UK sender otherwise), and stage the looked-up customer in `pending_customer_*` |
-| `verify_otp`               | Talkdesk workflow   | Auth                                                                 | Compare the entered code with `sent_pin`; on MATCH set `authenticated = "true"` and copy `pending_customer_*` to `customer_*` |
+| `verify_otp`               | Talkdesk workflow   | Auth                                                                 | Compare the entered code with `sent_pin`; on MATCH set `authenticated = "true"` and copy `pending_customer_*` to `customer_*`; count wrong codes in `otp_attempts` and return `LOCKED` from the 3rd |
 | `search_knowledge_internal`| Talkdesk built-in   | Claims Knowledge                                                     | KB search against the `crestline_claims` segment |
 
 ### Authentication (as built)
@@ -201,12 +203,20 @@ OTP flow:
    the model cannot influence the match. On MATCH (6 digits, equal,
    pending cid present) it sets `otp_result = "MATCH"`,
    `authenticated = "true"` and copies `pending_customer_*` to
-   `customer_*`. Otherwise it returns `NO_MATCH` and
+   `customer_*`. Otherwise it adds 1 to `otp_attempts` and returns
+   `NO_MATCH` (or `LOCKED` on the 3rd wrong code), with
    `authenticated = "false"`.
-4. Three NO_MATCH results in total (a resend does not reset the count)
-   end with `auth_result: failed / max_attempts` and a `lockout` row in
-   `auth_events`. A new code is only offered after the 1st or 2nd
-   wrong code, so at most 3 codes are sent.
+4. The workflow, not the model, counts wrong codes in the `otp_attempts`
+   variable; a resend does not reset it. Once the count reaches 3,
+   every `verify_otp` call returns `LOCKED`, even with the correct
+   code, so the lockout is enforced by the tool. On `LOCKED` the Auth
+   Agent writes a `lockout` row to `auth_events` and returns
+   `auth_result: failed / max_attempts`. A new code is only offered
+   after a `NO_MATCH`, so at most 3 codes are sent. (Before v23 the
+   model counted the NO_MATCH results itself; on 2026-10-23 it lost
+   track after the 2nd and re-called `verify_otp` with the same code,
+   which tripped the duplicate-skill-call guard below. The NO_MATCH
+   step now names the reply as the agent's next action.)
 5. The Auth Agent logs `auth_success`, `lockout` and `auth_failed`
    (unknown phone number) to `auth_events` with `execute_sql`. Each
    INSERT step carries the act-don't-narrate guard; without it the
@@ -408,7 +418,7 @@ Only chat is wired up at present (`conversation_settings.enabled = false`).
 All voice-specific guidance in this document (DTMF, silence-fillers,
 spelling phonetically) is target-state.
 
-Session settings in version 22: inactivity timeout 900 s (default and
+Session settings in version 23: inactivity timeout 900 s (default and
 chat), 50 s (voice); the Orchestrator is notified on timeout and on
 hang-up, and hang-up data is compiled and shared. The Orchestrator
 instruction does not yet handle those notifications.
