@@ -1,0 +1,6 @@
+{
+  "name": "crestline-talkdesk-tests",
+  "private": true,
+  "description": "Scripted customer test suite for the Crestline Talkdesk AI agent system",
+  "dependencies": { "ws": "^8.18.0" }
+}

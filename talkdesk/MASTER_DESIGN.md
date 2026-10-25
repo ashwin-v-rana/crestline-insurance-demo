@@ -79,32 +79,41 @@ and chat channels.
 
 ---
 
-## Implementation State (2026-10-20)
+## Implementation State (2026-10-25)
 
 The rest of this document describes the **target architecture**. This
 section documents what is **actually deployed today** in the
 `Crestline_Insurance_GOLDEN_TEMPLATE` Talkdesk agent system (named
-`Crestline Insurance v2` until version 3), version 23, published
-2026-10-24 UTC (exported as `crestline-ai-agent-system_US.json`).
-Version 23 is version 22 plus the OTP lockout fix: `verify_otp` now
-counts wrong codes itself and returns `LOCKED`. Version 22 was version
-21 (the human-handoff redesign, 2026-10-20) plus the Authentication
-Gate restored on Drivers and Claims Knowledge. Read this first to calibrate expectations, then read the rest
-as forward-looking design. When reality catches up to the design, this
-section gets deleted.
+`Crestline Insurance v2` until version 3), version 25, published
+2026-10-25 UTC (exported as `crestline-ai-agent-system_US.json`).
+Version 25 is version 24 plus one reply format between the sub-agents
+and the Orchestrator (see "Sub-agent hand-off (as built)"). Version 24
+rebuilt the Orchestrator (routing first, decisions by who sent the last
+message, about 8.5k characters), made the Escalation Agent call
+`transfer_to_human` itself, and gave the 2nd wrong OTP code its own
+reply. Version 23 moved OTP lockout counting into `verify_otp`; version
+22 restored the Authentication Gate on Drivers and Claims Knowledge
+after the 2026-10-20 human-handoff redesign. Read this first to
+calibrate expectations, then read the rest as forward-looking design.
+When reality catches up to the design, this section gets deleted.
+
+The scripted test suite for this system is in `talkdesk/tests/` (see
+its README): 30 simulated conversations scored PASS/FAIL, including
+Orchestrator faults such as answering a sub-agent's question for the
+customer.
 
 ### Deployed agents (8 total)
 
 | # | Agent name (in Talkdesk)   | Role               | Scope as deployed |
 |---|----------------------------|--------------------|-------------------|
-| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, verbatim relay of sub-agent messages (numbered lists in full, completion messages word for word), warm-handoff messaging on escalate. Never writes its own questions; passes the customer's answer back to the sub-agent that asked, even if partial; a sub-agent's question (including a read-back) always goes to the customer, never back to a sub-agent. Routes on topic without collecting details first, restating every detail of the request. Sends every escalation through the Escalation Agent, then ends the conversation with `transfer_to_human`. Zero business logic. See "Sub-agent hand-off (as built)" and "Human handoff (as built)". |
+| 1 | **Crestline Orchestrator** | `SUPERVISING_AGENT`| Greeting, routing, delivery, closing; zero business logic. Routes on topic first, without collecting details, restating every detail of the request. Handles each sub-agent reply with a first-match table: `ASK_CUSTOMER` text goes to the customer exactly, the customer's answer goes back as `CUSTOMER_REPLY: "<exact words>"`, and it never answers a sub-agent's question itself. Billing (including autopay), quotes and requests for a person go to the Escalation Agent; it finishes each handoff with `transfer_to_human` and the Escalation Agent's line. See "Sub-agent hand-off (as built)" and "Human handoff (as built)". |
 | 2 | **Auth Agent**             | `ACTION_AGENT`     | Phone-based identity verification via 6-digit SMS OTP. The agent never sets session variables itself: the `verify_otp` workflow sets `authenticated` and the four customer variables (`customer_id`, `customer_fname`, `customer_lname`, `customer_email`) only on a matching code. See "Authentication (as built)" below. |
 | 3 | **Policy Agent**           | `ACTION_AGENT`     | **Mailing-address updates only.** Asks "mail or moving?" only when the request doesn't say, and at most once. Collects the whole address in one question, then asks only for missing fields; converts state names itself; a "no" at the read-back fixes only the wrong field. Writes `customers.mailing_address` JSONB. Every other request (including physical moves) → `escalate` to `policy_service`. |
 | 4 | **Vehicle Agent**          | `ACTION_AGENT`     | Add / remove vehicle on the active Auto policy. Year, make and model in one question (or taken from the request); free-text VIN (no VIN decode). Offers the mailing address as the garaging address, otherwise one address question; the read-back is always its own question and only the customer's own yes saves. Soft-delete on removal. ID card / proof of coverage / replace → escalate. |
-| 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. License number/state optional. No MVR check. Soft-delete on removal; the removal list query excludes the named insured and `self` drivers. Changes to an existing driver's details → escalate at once. |
+| 5 | **Drivers Agent**          | `ACTION_AGENT`     | Add / remove non-self, non-named-insured driver on the active Auto policy. Asks one field per message (relationship taken from the request when it says "my son" etc.); the read-back is its own message and only the customer's own yes saves. License number/state optional. No MVR check. Soft-delete on removal; the removal list query excludes the named insured and `self` drivers. Changes to an existing driver's details → escalate at once. |
 | 6 | **Claims Agent**           | `ACTION_AGENT`     | Auto FNOL only. Collects loss date/type/location/description, police report number, and vehicle, then INSERTs into `claims` with a hardcoded adjuster (Sarah Mitchell). Status / Q&A → reroute to Claims Knowledge. Home/Umbrella FNOL → escalate. |
 | 7 | **Claims Knowledge Agent** | `ACTION_AGENT`     | Read-only. Claim status lookup, claim-specific explanations, and general insurance Q&A backed by Talkdesk's `search_knowledge_internal` against the `crestline_claims` segment. |
-| 8 | **Escalation Agent**       | `ACTION_AGENT`     | Prepares every human handoff; never speaks to the customer. Uses the team the Orchestrator names, or classifies billing → `billing_specialist`, quote → `sales_agent`, anything else → `human_request`. Reads the session with `get_customer_context`, builds the human agent's brief with `Load Transfer Data`, and returns `transfer_ready` (or `transfer_error`). Stands in for the still-unbuilt Billing and Quote agents. |
+| 8 | **Escalation Agent**       | `ACTION_AGENT`     | Handles every human handoff. Uses the team the Orchestrator names, or classifies billing → `billing_specialist`, quote → `sales_agent`, anything else → `human_request`. Reads the session with `get_customer_context`, builds the human agent's brief with `Load Transfer Data`, then calls `transfer_to_human` with `STATUS: TRANSFER \| TELL_CUSTOMER: "<team line>"`, which the Orchestrator completes. Stands in for the still-unbuilt Billing and Quote agents. |
 
 ### What the design specifies but isn't built
 
@@ -216,7 +225,11 @@ OTP flow:
    model counted the NO_MATCH results itself; on 2026-10-23 it lost
    track after the 2nd and re-called `verify_otp` with the same code,
    which tripped the duplicate-skill-call guard below. The NO_MATCH
-   step now names the reply as the agent's next action.)
+   step now names the reply as the agent's next action.) Since v24 the
+   2nd wrong code gets a different line ("That code still didn't
+   match, and you have one try left...") from `otp_next_step`: two
+   identical replies in a row made the model repeat its last action
+   (re-send the same code or re-call `verify_otp`).
 5. The Auth Agent logs `auth_success`, `lockout` and `auth_failed`
    (unknown phone number) to `auth_events` with `execute_sql`. Each
    INSERT step carries the act-don't-narrate guard; without it the
@@ -311,50 +324,80 @@ defence.
 
 ### Sub-agent hand-off (as built)
 
-Section 5 specifies JSON results from sub-agents (`"status":
-"complete"`, `"escalate"` with `escalation_target`, `"reroute"`). In
-every Simulator trace so far, that JSON reaches the Orchestrator as
-**plain text** instead: Auth's `{"auth_result": "success"}` arrives as
-"The user has been authenticated successfully.", a completion arrives
-as just its `customer_message`, and an escalation as a sentence such
-as "...out of scope. Escalating to policy service." Whether the
-platform or the model does this is open with Talkdesk engineering.
+**How Talkdesk wires it (seen in the LLM calls, 2026-10-25).** Only the
+Orchestrator talks to the customer. A sub-agent's message reaches the
+Orchestrator's model as a message addressed to it (`[Drivers Agent to
+COORDINATOR] ...`), and the customer's answer reaches the sub-agent as
+whatever the Orchestrator writes (`[COORDINATOR to Drivers Agent]
+...`), so a sub-agent cannot tell the customer's words from the
+Orchestrator's summary. Talkdesk's own wrapper tells every sub-agent
+to speak to the Coordinator, not the customer ("I need the user's
+name", not "Can I have your name?"). After the conversation, on every
+turn, Talkdesk appends a System Hint, Security Guidelines and a ~18k
+character Date Resolution block to both the Orchestrator's and the
+sub-agents' prompts ("ask for missing parameters", "never ask for
+information already available", "after one clear confirmation,
+continue"). Instructions that conflict with those blocks lose.
 
-The Orchestrator therefore works on meaning, not fields:
+Before v25, sub-agents wrote free-text questions for the customer,
+which contradicted the wrapper, so they switched between "you..." and
+"the customer's..." styles. Across 128 test runs the Orchestrator
+handled structured replies (JSON or a `STATUS:` line) correctly 113 of
+114 times, but reworded or misrouted free text often: it confirmed a
+driver removal for the customer (the driver was removed without
+consent), dropped a numbered list of drivers, and asked its own
+questions instead of passing replies on.
 
-- Two rules sit at the top of its instruction (ported from the Wren
-  restaurant system, 2026-10-19): it never writes its own questions,
-  and the customer's answer goes back to the sub-agent that asked, in
-  the same turn and unchanged, even if it is only part of what was
-  asked. Before this, the Orchestrator judged a partial address
-  incomplete and asked for the full address itself, so the Policy
-  Agent never saw the reply.
-- Sub-agents see only the Orchestrator's message to them, so every
-  routing message restates the details the customer gave for this
-  request (e.g. an address in the opening message). Details of a task
-  already completed are not carried into a new one.
+**The reply format (v25).** Every sub-agent (except Escalation) starts
+with a "HOW YOU REPLY" block. Each `reply_to_coordinator` message is
+exactly one of:
 
-- A plain-text completion sentence is delivered word for word, then
-  "Is there anything else I can help you with today?". The closing
-  line is used only after the customer says they're done.
-- A message saying the request is out of scope, can't be handled or
-  should be escalated is treated as an escalation and goes to the
-  Escalation Agent (see "Human handoff (as built)"). The human teams
-  are never sub-agents, so no other agent receives an escalation.
+- `STATUS: NEED_INPUT | ASK_CUSTOMER: "<question, word for word>"` for
+  every question, read-back, pick-list and skill-provided line. The
+  whole text goes inside the quotes (all list items); one question per
+  message; a read-back is always its own message.
+- The JSON the agent's steps define: `{"status": "complete",
+  "customer_message": ...}`, `{"status": "escalate",
+  "escalation_target": ..., "escalation_reason": ...}`, Auth's
+  `{"auth_result": ...}`. The platform's gate reply stays `STATUS:
+  NEEDS_AUTHENTICATION`.
 
-Known gap until engineering replies: before the 2026-10-20 handoff
-redesign, the handoff line didn't always match the team, and the
-Orchestrator once told the customer a request was "not in the current
-automation scope". The redesign gives the Orchestrator one verbatim
-line per team; re-test before relying on it.
+The customer's answer comes back as `CUSTOMER_REPLY: "<the customer's
+exact words>"`. A read-back counts as confirmed only when that
+CUSTOMER_REPLY says yes; a Coordinator sentence like "The customer
+confirms..." is not a yes, and no write or email happens before it.
+
+The Orchestrator handles a sub-agent message with a first-match table:
+`ASK_CUSTOMER` → `reply_to_user` with the quoted text; Escalation's
+`STATUS: TRANSFER` → `transfer_to_human` with the quoted line;
+`NEEDS_AUTHENTICATION` → Auth Agent; `auth_result` success → back to the
+gated agent with the original request; `max_attempts` → Escalation
+(`identity_verification`); `no_account` / `lookup_error` → the
+not-found line; `customer_message` → delivered word for word plus "Is
+there anything else I can help you with today?"; `"status":
+"escalate"` → Escalation; leftover free text is delivered if it asks
+the customer something, otherwise answered with `CONTINUE`. Before
+delivering it checks the text ends with the same question, keeps every
+value and list item, and is not shorter. This is the toolkit's
+"Pattern 2" (sub-agents compose, the Orchestrator relays) with an
+explicit envelope.
+
+Routing messages still restate every detail the customer gave for the
+request; details from a finished task are not carried into a new one.
+
+Known gap (v25): after an Auth lockout the Orchestrator once wrote its
+own "maximum attempts... connect you?" message before handing off on
+the customer's next message (test `skipped_escalation`).
 
 ### Human handoff (as built)
 
-Added 2026-10-20 (published v21). Every escalation follows one path:
+Added 2026-10-20 (published v21); steps 2 and 4 changed in v24/v25.
+Every escalation follows one path:
 
 1. **Orchestrator → Escalation Agent, silently.** Triggers: the
-   customer asks for a person, a billing or new-quote request, or a
-   sub-agent escalating. The Orchestrator says nothing to the customer
+   customer asks for a person, a billing (including autopay) or
+   new-quote request, a sub-agent escalating, or an Auth lockout
+   (`identity_verification`). The Orchestrator says nothing to the customer
    yet. It passes an `escalation_target` when one is known, plus two
    labelled lines built from the conversation:
    `Interaction summary` = `ISSUE: ... || ACTIONS: ...` and
@@ -363,10 +406,12 @@ Added 2026-10-20 (published v21). Every escalation follows one path:
 2. **Escalation Agent.** Picks the team (the named target, else
    billing → `billing_specialist`, quote → `sales_agent`, else
    `human_request`), calls `get_customer_context`, then
-   `Load Transfer Data` with those values. It returns
-   `{"status":"transfer_ready","escalation_target":...}` only when the
-   workflow's `transfer_data` output is non-empty, otherwise
-   `transfer_error`. It never speaks, runs SQL or transfers.
+   `Load Transfer Data` with those values (once more if
+   `transfer_data` comes back empty; still empty → the `system_error`
+   line). Then it calls `transfer_to_human` with
+   `STATUS: TRANSFER | TELL_CUSTOMER: "<the team's line>"`. Only if that
+   fails does it reply `{"status":"transfer_error",...}`. It never runs
+   SQL.
 3. **`Load Transfer Data` workflow.** Clears `Transfer Data`, then
    builds `CUSTOMER / CONTACT / ISSUE / COMPLETED / TEAM / NEXT ACTION`
    joined by `||`. Name, phone and email are included only when
@@ -376,21 +421,23 @@ Added 2026-10-20 (published v21). Every escalation follows one path:
    `Transfer reason`. `Transfer Data` is the agent system's
    **Application Output**, which reaches the human agent through
    Studio.
-4. **Orchestrator → `transfer_to_human`.** After `transfer_ready` (one
-   `CONTINUE` retry on prose or `transfer_error`; still failing → the
-   `system_error` line), it calls `transfer_to_human` with the team's
-   verbatim line as the message. That call ends the conversation; the
-   Orchestrator does not use `reply_to_user` for a handoff.
+4. **Orchestrator → `transfer_to_human`.** A sub-agent's
+   `transfer_to_human` does **not** end the conversation on Talkdesk:
+   it comes back to the Orchestrator as a transfer request. Only the
+   Orchestrator's own `transfer_to_human` exits with `escalate`. So the
+   Orchestrator finishes the handoff with the quoted line, word for
+   word (on `transfer_error`: the `system_error` line). It does not use
+   `reply_to_user` for a handoff.
 
-Teams and lines: `billing_specialist`, `sales_agent`, `policy_service`,
-`claims_intake`, `human_request`, `system_error` (and an extra
-`quote_request` line that no rule currently produces). With no team
-named, the `policy_service` line is used.
+Teams and lines (in the Escalation Agent): `billing_specialist`,
+`sales_agent`, `policy_service`, `claims_intake`,
+`identity_verification` ("For your security, I'll connect you with a
+team member who can help verify your identity."), `human_request`,
+`system_error`.
 
 New custom variables: `Transfer Data`, `Transfer reason`,
 `Interaction summary`. The design follows the Wren system's
-pre-escalation pattern. The Orchestrator instruction grew to about
-15.5k characters, above the 12-14k guideline below.
+pre-escalation pattern.
 
 ### Instruction authoring rules (as built)
 
@@ -411,6 +458,17 @@ pre-escalation pattern. The Orchestrator instruction grew to about
   The Policy Agent rejected "Texas" as "not 2 letters" until the
   instruction said to convert full names itself and never ask the
   customer to reformat.
+- **State the rule, not the prohibition.** "Never ask for the phone
+  number" made the Orchestrator tell customers "I can't ask for your
+  phone number..." while relaying the Auth Agent's question; "deliver
+  the Auth Agent's question exactly as written" fixed it (v24).
+- **Avoid two identical replies in a row.** The model tends to repeat
+  its last action when it sees the same message twice (see the 2nd
+  wrong-code line above).
+- **Don't fight the platform blocks.** Talkdesk's wrapper and the
+  blocks it appends after the conversation win conflicts; work with
+  them (e.g. the ASK_CUSTOMER envelope addresses the Coordinator, as
+  the wrapper requires) instead of overriding them in prose.
 
 ### Channel scope
 
@@ -418,7 +476,7 @@ Only chat is wired up at present (`conversation_settings.enabled = false`).
 All voice-specific guidance in this document (DTMF, silence-fillers,
 spelling phonetically) is target-state.
 
-Session settings in version 23: inactivity timeout 900 s (default and
+Session settings in version 25: inactivity timeout 900 s (default and
 chat), 50 s (voice); the Orchestrator is notified on timeout and on
 hang-up, and hang-up data is compiled and shared. The Orchestrator
 instruction does not yet handle those notifications.
