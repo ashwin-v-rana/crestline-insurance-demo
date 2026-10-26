@@ -20,6 +20,29 @@ Optional: `TD_SYSTEM_ID` (agent system), `TD_ACCOUNT_ID`, `TD_ORIGIN`
 (`https://<tenant>.mytalkdesk.com`), `TD_TENANT` for the token host.
 Tokens expire after about an hour; run `./get_token.sh` again.
 
+### OAuth client scopes
+
+`get_token.sh` uses the `client_credentials` grant without a `scope`
+parameter (the request fails if you pass one); the token gets every scope
+assigned to the client. What the Crestline automation uses (checked from
+the token on 2026-10-25):
+
+| Scope | Used for | Needed? |
+|---|---|---|
+| `ai-agent-platform-agents:read` | Read agent systems, versions and full config (export, diff, re-read before a save) | Required |
+| `ai-agent-platform-agents:write` | Save the draft (`PUT /multi-agent/manage/agent-system`) | Required for API edits |
+| `ai-agent-context:write` | Start simulator sessions (`POST /chat/context`); this test suite | Required |
+| `prompt-tuning-service:read`, `prompt-tuning-service:write` | Talkdesk Agent Evaluation jobs: list, results, transcripts, artifacts | For evals |
+| `ai-agent-conversations-export:read` | Export AI agent conversations | Optional (not used yet) |
+| `actions:read`, `actions:write`, `connection-action-executions:write`, `connections-flows:read`, `connections-flows:submit`, `connections-templates:read`, `connections-templates:write`, `digital-connection-execution:write` | Connections and actions behind agent tools (we only list connections) | Optional |
+
+Also on our client but not used by this automation:
+`agent-assist-chat-rooms:write`, `agent-assist-chat-tickets:write`,
+`interactions:test`, `policies:evaluate`. Creating connections would also
+need `connections-flows:write` and `integrations:*`. Publishing through the
+API is refused, so publish in the Talkdesk UI. Databricks (LLM-call
+extracts) uses its own browser login, not these scopes.
+
 ## Run
 
 ```bash
